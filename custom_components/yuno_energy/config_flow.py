@@ -30,7 +30,7 @@ from .const import (
     DOMAIN,
     MIN_SCAN_INTERVAL_MINUTES,
 )
-from .flow_errors import error_key_from_exception
+from .flow_errors import diagnostic_message_from_exception, error_key_from_exception
 from .yuno_api.client import AiohttpSessionAdapter, YunoApiClient, YunoApiError
 
 _LOGGER = logging.getLogger(__name__)
@@ -103,8 +103,9 @@ class YunoEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: i
     ) -> config_entries.ConfigFlowResult:
         """Create a Yuno Energy config entry."""
         errors: dict[str, str] = {}
+        description_placeholders: dict[str, str] = {}
         if user_input is not None:
-            errors = await self._validate_input(user_input)
+            errors, description_placeholders = await self._validate_input(user_input)
             if not errors:
                 await self.async_set_unique_id(DOMAIN)
                 self._abort_if_unique_id_configured(updates=user_input)
@@ -114,6 +115,7 @@ class YunoEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: i
             step_id="user",
             data_schema=_user_schema(user_input),
             errors=errors,
+            description_placeholders=description_placeholders,
         )
 
     async def async_step_reauth(
@@ -135,8 +137,9 @@ class YunoEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: i
         entry = self.hass.config_entries.async_get_entry(self.__yuno_reauth_entry_id)
         defaults = dict(entry.data) if entry else {}
         errors: dict[str, str] = {}
+        description_placeholders: dict[str, str] = {}
         if user_input is not None:
-            errors = await self._validate_input(user_input)
+            errors, description_placeholders = await self._validate_input(user_input)
             if not errors and entry is not None:
                 self.hass.config_entries.async_update_entry(entry, data=user_input)
                 await self.hass.config_entries.async_reload(entry.entry_id)
@@ -145,6 +148,7 @@ class YunoEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: i
             step_id="reauth_confirm",
             data_schema=_user_schema(user_input or defaults),
             errors=errors,
+            description_placeholders=description_placeholders,
         )
 
     async def async_step_reconfigure(
@@ -158,21 +162,26 @@ class YunoEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: i
         entry = self.hass.config_entries.async_get_entry(entry_id)
         defaults = dict(entry.data) if entry else {}
         errors: dict[str, str] = {}
+        description_placeholders: dict[str, str] = {}
         if user_input is not None:
-            errors = await self._validate_input(user_input)
+            errors, description_placeholders = await self._validate_input(user_input)
             if not errors and entry is not None:
                 return self.async_update_reload_and_abort(entry, data=user_input)
         return self.async_show_form(
             step_id="reconfigure",
             data_schema=_user_schema(user_input or defaults),
             errors=errors,
+            description_placeholders=description_placeholders,
         )
 
-    async def _validate_input(self, user_input: dict[str, Any]) -> dict[str, str]:
+    async def _validate_input(
+        self,
+        user_input: dict[str, Any],
+    ) -> tuple[dict[str, str], dict[str, str]]:
         if not has_basic_auth(user_input):
-            return {"base": "missing_basic_auth"}
+            return {"base": "missing_basic_auth"}, {}
         if not session_token_from_data(user_input) and not has_login_credentials(user_input):
-            return {"base": "missing_login_or_session"}
+            return {"base": "missing_login_or_session"}, {}
         client = YunoApiClient(
             session=AiohttpSessionAdapter(async_get_clientsession(self.hass)),
         )
@@ -183,9 +192,11 @@ class YunoEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: i
             else:
                 await client.login(auth)
         except (YunoApiError, TimeoutError, OSError) as err:
+            detail = diagnostic_message_from_exception(err)
+            _LOGGER.warning("Yuno validation failed: %s", detail)
             _LOGGER.debug("Yuno login validation failed", exc_info=True)
-            return {"base": error_key_from_exception(err)}
-        return {}
+            return {"base": error_key_from_exception(err)}, {"detail": detail}
+        return {}, {}
 
 
 class YunoEnergyOptionsFlow(config_entries.OptionsFlow):

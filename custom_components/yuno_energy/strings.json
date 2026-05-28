@@ -27,11 +27,12 @@
       }
     },
     "error": {
-      "cannot_connect": "Yuno login failed. Check the encrypted credentials and static headers.",
-      "bad_response": "Yuno returned an unexpected response. The private API may have changed.",
-      "invalid_auth": "Yuno rejected the encrypted credentials or authorization headers.",
+      "cannot_connect": "Yuno could not be reached: {detail}",
+      "bad_response": "Yuno returned an unexpected response: {detail}",
+      "invalid_auth": "Yuno rejected the configured session token, encrypted credentials, or authorization headers: {detail}",
       "missing_login_or_session": "Provide either X-Http-sessionToken or the encrypted login fields.",
-      "missing_basic_auth": "Provide either a Basic Authorization header or a Basic username and password."
+      "missing_basic_auth": "Provide either a Basic Authorization header or a Basic username and password.",
+      "unknown": "Yuno setup failed: {detail}"
     },
     "abort": {
       "reauth_successful": "Yuno Energy reauthentication succeeded."
