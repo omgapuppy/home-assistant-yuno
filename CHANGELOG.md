@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3
+
+- Surface sanitized config-flow failure details in the Home Assistant UI and logs.
+- Include safe Yuno API error metadata such as HTTP status, title, and error code.
+- Improve config-flow error classification for usage response parse failures.
+
 ## 0.1.2
 
 - Add session-token setup and polling support for long-lived Yuno app sessions.

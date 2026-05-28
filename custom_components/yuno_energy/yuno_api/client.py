@@ -189,11 +189,15 @@ class YunoApiClient:
 
     @staticmethod
     def _checked_payload(response: ResponseProtocol, *, action: str) -> dict[str, Any]:
-        if response.status_code in {401, 403}:
-            raise YunoApiError(f"{action} failed: authentication failed")
-        if response.status_code >= 400:
-            raise YunoApiError(f"{action} failed: HTTP {response.status_code}")
         payload = response.json()
+        details = _api_error_details(payload)
+        if response.status_code in {401, 403}:
+            raise YunoApiError(
+                f"{action} failed: authentication failed "
+                f"(HTTP {response.status_code}{details})"
+            )
+        if response.status_code >= 400:
+            raise YunoApiError(f"{action} failed: HTTP {response.status_code}{details}")
         if not isinstance(payload, dict):
             raise YunoApiError(f"{action} failed: response was not a JSON object")
         return payload
@@ -228,6 +232,17 @@ def _parse_hourly_usage(value: object) -> list[HourlyUsageDay]:
             )
         )
     return days
+
+
+def _api_error_details(payload: object) -> str:
+    if not isinstance(payload, dict):
+        return ""
+    parts: list[str] = []
+    for key in ("title", "errorCode", "status"):
+        value = payload.get(key)
+        if isinstance(value, (str, int, float)):
+            parts.append(f"{key}={value}")
+    return f"; {', '.join(parts)}" if parts else ""
 
 
 def _parse_daily_usage(value: object) -> list[DailyUsage]:

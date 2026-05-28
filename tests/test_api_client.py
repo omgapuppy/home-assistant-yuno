@@ -155,3 +155,38 @@ async def test_raises_auth_error_for_unauthorized_response() -> None:
 
     with pytest.raises(YunoApiError, match="authentication failed"):
         await client.login(auth)
+
+
+@pytest.mark.asyncio
+async def test_error_includes_safe_api_error_details() -> None:
+    class UnauthorizedSession(FakeSession):
+        async def get(self, url: str, *, headers: dict[str, str]) -> FakeResponse:
+            return FakeResponse(
+                401,
+                {
+                    "title": "Unauthorized",
+                    "errorCode": "AUTH_FAILED",
+                    "status": 401,
+                    "displayMessage": "do not include this",
+                },
+            )
+
+    client = YunoApiClient(session=UnauthorizedSession())
+    auth = AuthConfig(
+        encrypted_email="encrypted-email",
+        encrypted_password="encrypted-password",
+        basic_authorization="Basic fixture",
+        origin_id="64",
+        login_signature="login-signature",
+        usage_signature="usage-signature",
+    )
+
+    with pytest.raises(YunoApiError) as err:
+        await client.get_electricity_usage(auth, session_token="fixture-session")
+
+    message = str(err.value)
+    assert "HTTP 401" in message
+    assert "title=Unauthorized" in message
+    assert "errorCode=AUTH_FAILED" in message
+    assert "status=401" in message
+    assert "do not include this" not in message
