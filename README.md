@@ -81,19 +81,43 @@ rm yuno_energy.zip
 
 The Yuno API uses static Basic client auth, static per-endpoint signatures, `X-Http-originid`, and an app-level session token returned by login.
 
-Copy these fields from your own captures:
+There are two setup modes:
 
-- From `POST /api/login` request body:
-  - `email` value into **Encrypted email**
-  - `password` value into **Encrypted password**
-- From `POST /api/login` request headers:
-  - `Authorization` into **Basic Authorization header**, or copy its Basic username/password into the separate fields
-  - `X-Http-originid`, usually `64`
-  - `X-Http-signature` into **Login X-Http-signature**
-- From `GET /api/bill/electricityUsage` request headers:
-  - `X-Http-signature` into **Electricity usage X-Http-signature**
+- **Session-token mode** is currently the most reliable path. It uses the app session token already issued to your Yuno app.
+- **Replay-login mode** tries to call `POST /api/login` using the encrypted login body captured from the app. Yuno may reject old encrypted login payloads even while an existing app session token continues to work.
 
-Do not copy `X-Http-sessionToken` into setup. The integration obtains a fresh session token by logging in.
+### Recommended: Session-Token Mode
+
+Copy these fields from a successful `GET /api/bill/electricityUsage` request:
+
+| Capture value | Integration field | Copy rule |
+| --- | --- | --- |
+| `Authorization: Basic abc123...` | **Basic Authorization header** | Copy the full value after the first colon: `Basic abc123...`. Keep the `Basic ` prefix. |
+| `X-Http-originid: 64` | **X-Http-originid** | Copy `64`. |
+| `X-Http-signature: 64:a1b868...` | **Electricity usage X-Http-signature** | Copy `64:a1b868...`. Keep the `64:` prefix if it is present. |
+| `X-Http-sessionToken: eyJ...` | **X-Http-sessionToken** | Copy only the token value after the first colon. Do not include `X-Http-sessionToken:`. |
+
+You can leave **Encrypted email**, **Encrypted password**, and **Login X-Http-signature** blank when using session-token mode.
+
+### Optional Fallback: Replay-Login Mode
+
+If you also want the integration to try a fresh login when the configured session token expires, copy these additional fields from `POST /api/login`:
+
+| Capture value | Integration field | Copy rule |
+| --- | --- | --- |
+| JSON body `"email": "..."` | **Encrypted email** | Copy the encrypted string value only, without JSON quotes. |
+| JSON body `"password": "..."` | **Encrypted password** | Copy the encrypted string value only, without JSON quotes. |
+| `X-Http-signature: 64:121eed...` | **Login X-Http-signature** | Copy `64:121eed...`. Keep the `64:` prefix if it is present. |
+
+If you do not provide **X-Http-sessionToken**, those three replay-login fields become required. You still need **Basic Authorization header**, **X-Http-originid**, and **Electricity usage X-Http-signature** because the integration must fetch usage after login.
+
+### Field Copying Rules
+
+- Copy header values, not header names. For example, from `X-Http-signature: 64:abc`, enter `64:abc`.
+- Keep prefixes that are part of the value. `Basic ` and `64:` are part of the values seen in captures.
+- Do not add quotes around copied values in the Home Assistant form.
+- Do not paste whole request or response bodies into issues, logs, or screenshots.
+- Prefer copying `X-Http-sessionToken` from the `GET /api/bill/electricityUsage` request header. The `sessionToken` value in a login response is also sensitive, but the request header is the exact value the integration needs.
 
 ## Capturing Your Own Values
 
@@ -160,7 +184,9 @@ Current coverage:
 
 ## Troubleshooting
 
-Login failures usually mean one of the encrypted credential values, Basic auth value, origin id, or login signature has changed. Capture a fresh login from your own app and update the integration entry.
+Login failures in replay-login mode usually mean one of the encrypted credential values, Basic auth value, origin id, or login signature has changed or expired. Capture a fresh login from your own app and update the integration entry.
+
+Session-token failures usually mean the app session expired or the electricity usage signature changed. Capture a fresh `GET /api/bill/electricityUsage` request and update **X-Http-sessionToken** and **Electricity usage X-Http-signature**.
 
 Stale data normally means Yuno has not published newer smart-meter usage yet. Check the latest usage date and data freshness lag sensors.
 

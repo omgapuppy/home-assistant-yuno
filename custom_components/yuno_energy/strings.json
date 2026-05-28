@@ -11,8 +11,9 @@
           "basic_username": "Basic username",
           "basic_password": "Basic password",
           "origin_id": "X-Http-originid",
-          "login_signature": "Login X-Http-signature",
           "usage_signature": "Electricity usage X-Http-signature",
+          "session_token": "X-Http-sessionToken",
+          "login_signature": "Login X-Http-signature",
           "scan_interval_minutes": "Polling interval in minutes"
         }
       },
@@ -29,6 +30,7 @@
       "cannot_connect": "Yuno login failed. Check the encrypted credentials and static headers.",
       "bad_response": "Yuno returned an unexpected response. The private API may have changed.",
       "invalid_auth": "Yuno rejected the encrypted credentials or authorization headers.",
+      "missing_login_or_session": "Provide either X-Http-sessionToken or the encrypted login fields.",
       "missing_basic_auth": "Provide either a Basic Authorization header or a Basic username and password."
     },
     "abort": {
