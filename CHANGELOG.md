@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.6
+
+- Group Yuno sensor entities under a Home Assistant device for the config entry.
+
 ## 0.1.5
 
 - Use Home Assistant-valid external statistic IDs for recorder imports.
