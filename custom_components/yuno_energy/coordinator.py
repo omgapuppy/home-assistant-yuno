@@ -12,7 +12,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .config_flow import auth_config_from_data
+from .config_data import auth_config_from_data, has_login_credentials, session_token_from_data
 from .const import CONF_SCAN_INTERVAL_MINUTES, DEFAULT_SCAN_INTERVAL, DOMAIN
 from .statistics import async_import_hourly_statistics
 from .yuno_api.client import AiohttpSessionAdapter, YunoApiClient, YunoApiError
@@ -67,9 +67,33 @@ class YunoEnergyCoordinator(DataUpdateCoordinator[Any]):
                 cast(list[str], stored.get("imported_cost_starts", []))
             )
             self.cost_last_sum = float(stored.get("cost_last_sum", 0.0))
-            auth = auth_config_from_data(dict(self.entry.data))
-            login = await self.api.login(auth)
-            usage = await self.api.get_electricity_usage(auth, session_token=login.session_token)
+            entry_data = dict(self.entry.data)
+            auth = auth_config_from_data(entry_data)
+            try:
+                if configured_session_token := session_token_from_data(entry_data):
+                    usage = await self.api.get_electricity_usage(
+                        auth,
+                        session_token=configured_session_token,
+                    )
+                else:
+                    login = await self.api.login(auth)
+                    usage = await self.api.get_electricity_usage(
+                        auth,
+                        session_token=login.session_token,
+                    )
+            except YunoApiError as err:
+                if (
+                    configured_session_token
+                    and "authentication failed" in str(err)
+                    and has_login_credentials(entry_data)
+                ):
+                    login = await self.api.login(auth)
+                    usage = await self.api.get_electricity_usage(
+                        auth,
+                        session_token=login.session_token,
+                    )
+                else:
+                    raise
             (
                 self.imported_energy_starts,
                 self.energy_last_sum,

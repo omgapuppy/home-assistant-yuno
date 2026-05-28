@@ -17,7 +17,7 @@ class ResponseProtocol(Protocol):
     def status_code(self) -> int:
         """Return HTTP status code."""
 
-    def json(self) -> dict[str, Any]:
+    def json(self) -> object:
         """Return decoded JSON."""
 
 
@@ -105,12 +105,18 @@ class AiohttpSessionAdapter:
         json: dict[str, object],
     ) -> ResponseProtocol:
         async with self._session.post(url, headers=headers, json=json) as response:
-            payload = await response.json()
+            try:
+                payload = await response.json(content_type=None)
+            except ValueError:
+                payload = None
             return AiohttpResponseAdapter(response.status, payload)
 
     async def get(self, url: str, *, headers: dict[str, str]) -> ResponseProtocol:
         async with self._session.get(url, headers=headers) as response:
-            payload = await response.json()
+            try:
+                payload = await response.json(content_type=None)
+            except ValueError:
+                payload = None
             return AiohttpResponseAdapter(response.status, payload)
 
 
@@ -119,9 +125,9 @@ class AiohttpResponseAdapter:
     """Simple response wrapper for aiohttp results."""
 
     status_code: int
-    payload: dict[str, Any]
+    payload: object
 
-    def json(self) -> dict[str, Any]:
+    def json(self) -> object:
         """Return decoded JSON."""
         return self.payload
 
@@ -172,8 +178,11 @@ class YunoApiClient:
     @staticmethod
     def _headers(auth: AuthConfig, signature: str) -> dict[str, str]:
         return {
+            "Accept": "application/json",
+            "Accept-Language": "en-IE,en;q=0.9",
             "Authorization": auth.basic_authorization,
             "Content-Type": "application/json",
+            "User-Agent": "YunoEnergyHomeAssistant/0.1",
             "X-Http-originid": auth.origin_id,
             "X-Http-signature": signature,
         }

@@ -9,6 +9,12 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
+from .config_data import (
+    auth_config_from_data,
+    has_basic_auth,
+    has_login_credentials,
+    session_token_from_data,
+)
 from .const import (
     CONF_BASIC_AUTHORIZATION,
     CONF_BASIC_PASSWORD,
@@ -18,12 +24,14 @@ from .const import (
     CONF_LOGIN_SIGNATURE,
     CONF_ORIGIN_ID,
     CONF_SCAN_INTERVAL_MINUTES,
+    CONF_SESSION_TOKEN,
     CONF_USAGE_SIGNATURE,
     DEFAULT_ORIGIN_ID,
     DOMAIN,
     MIN_SCAN_INTERVAL_MINUTES,
 )
-from .yuno_api.client import AiohttpSessionAdapter, AuthConfig, YunoApiClient, YunoApiError
+from .flow_errors import error_key_from_exception
+from .yuno_api.client import AiohttpSessionAdapter, YunoApiClient, YunoApiError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -33,10 +41,18 @@ def _user_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     return vol.Schema(
         {
             vol.Required(
+                CONF_USAGE_SIGNATURE,
+                default=defaults.get(CONF_USAGE_SIGNATURE, ""),
+            ): str,
+            vol.Optional(
+                CONF_SESSION_TOKEN,
+                default=defaults.get(CONF_SESSION_TOKEN, ""),
+            ): str,
+            vol.Optional(
                 CONF_ENCRYPTED_EMAIL,
                 default=defaults.get(CONF_ENCRYPTED_EMAIL, ""),
             ): str,
-            vol.Required(
+            vol.Optional(
                 CONF_ENCRYPTED_PASSWORD,
                 default=defaults.get(CONF_ENCRYPTED_PASSWORD, ""),
             ): str,
@@ -56,44 +72,15 @@ def _user_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
                 CONF_ORIGIN_ID,
                 default=defaults.get(CONF_ORIGIN_ID, DEFAULT_ORIGIN_ID),
             ): str,
-            vol.Required(
+            vol.Optional(
                 CONF_LOGIN_SIGNATURE,
                 default=defaults.get(CONF_LOGIN_SIGNATURE, ""),
-            ): str,
-            vol.Required(
-                CONF_USAGE_SIGNATURE,
-                default=defaults.get(CONF_USAGE_SIGNATURE, ""),
             ): str,
             vol.Required(
                 CONF_SCAN_INTERVAL_MINUTES,
                 default=defaults.get(CONF_SCAN_INTERVAL_MINUTES, 360),
             ): vol.All(vol.Coerce(int), vol.Range(min=MIN_SCAN_INTERVAL_MINUTES)),
         }
-    )
-
-
-def auth_config_from_data(data: dict[str, Any]) -> AuthConfig:
-    """Build AuthConfig from config entry data."""
-    basic_authorization = str(data.get(CONF_BASIC_AUTHORIZATION) or "").strip()
-    if basic_authorization:
-        if not basic_authorization.lower().startswith("basic "):
-            basic_authorization = f"Basic {basic_authorization}"
-        return AuthConfig(
-            encrypted_email=str(data[CONF_ENCRYPTED_EMAIL]),
-            encrypted_password=str(data[CONF_ENCRYPTED_PASSWORD]),
-            basic_authorization=basic_authorization,
-            origin_id=str(data[CONF_ORIGIN_ID]),
-            login_signature=str(data[CONF_LOGIN_SIGNATURE]),
-            usage_signature=str(data[CONF_USAGE_SIGNATURE]),
-        )
-    return AuthConfig.from_basic_credentials(
-        encrypted_email=str(data[CONF_ENCRYPTED_EMAIL]),
-        encrypted_password=str(data[CONF_ENCRYPTED_PASSWORD]),
-        basic_username=str(data[CONF_BASIC_USERNAME]),
-        basic_password=str(data[CONF_BASIC_PASSWORD]),
-        origin_id=str(data[CONF_ORIGIN_ID]),
-        login_signature=str(data[CONF_LOGIN_SIGNATURE]),
-        usage_signature=str(data[CONF_USAGE_SIGNATURE]),
     )
 
 
@@ -182,18 +169,22 @@ class YunoEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: i
         )
 
     async def _validate_input(self, user_input: dict[str, Any]) -> dict[str, str]:
-        if not user_input.get(CONF_BASIC_AUTHORIZATION) and not (
-            user_input.get(CONF_BASIC_USERNAME) and user_input.get(CONF_BASIC_PASSWORD)
-        ):
+        if not has_basic_auth(user_input):
             return {"base": "missing_basic_auth"}
+        if not session_token_from_data(user_input) and not has_login_credentials(user_input):
+            return {"base": "missing_login_or_session"}
         client = YunoApiClient(
             session=AiohttpSessionAdapter(async_get_clientsession(self.hass)),
         )
         try:
-            await client.login(auth_config_from_data(user_input))
-        except (YunoApiError, TimeoutError, OSError):
+            auth = auth_config_from_data(user_input)
+            if session_token := session_token_from_data(user_input):
+                await client.get_electricity_usage(auth, session_token=session_token)
+            else:
+                await client.login(auth)
+        except (YunoApiError, TimeoutError, OSError) as err:
             _LOGGER.debug("Yuno login validation failed", exc_info=True)
-            return {"base": "cannot_connect"}
+            return {"base": error_key_from_exception(err)}
         return {}
 
 

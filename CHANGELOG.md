@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2
+
+- Add session-token setup and polling support for long-lived Yuno app sessions.
+- Improve config-flow login validation errors without logging secrets.
+- Clarify capture header-to-field mapping in setup docs.
+
 ## 0.1.1
 
 - Import Yuno hourly euro costs as a companion Energy Dashboard cost statistic.
