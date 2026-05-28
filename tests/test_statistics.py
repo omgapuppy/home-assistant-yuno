@@ -36,12 +36,20 @@ def test_builds_hourly_statistics_with_europe_dublin_wall_clock_hours() -> None:
 def test_statistic_id_is_stable_for_config_entry() -> None:
     assert (
         statistic_id_for_entry("abc123")
-        == "custom_components:yuno_energy_abc123_electricity_import"
+        == "yuno_energy:abc123_electricity_import"
     )
     assert (
         cost_statistic_id_for_entry("abc123")
-        == "custom_components:yuno_energy_abc123_electricity_import_cost"
+        == "yuno_energy:abc123_electricity_import_cost"
     )
+
+
+def test_statistic_id_sanitizes_config_entry_id() -> None:
+    assert (
+        statistic_id_for_entry("01JABC-def.123")
+        == "yuno_energy:01jabc_def_123_electricity_import"
+    )
+    assert statistic_id_for_entry("!!!") == "yuno_energy:entry_electricity_import"
 
 
 def test_builds_only_new_statistics_from_previous_cumulative_sum() -> None:

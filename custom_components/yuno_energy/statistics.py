@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, cast
@@ -11,7 +12,8 @@ from .const import DOMAIN
 from .yuno_api.models import HourlyUsageDay
 
 LOCAL_TZ = ZoneInfo("Europe/Dublin")
-STATISTICS_SOURCE = "recorder"
+STATISTICS_SOURCE = DOMAIN
+_INVALID_STATISTIC_OBJECT_ID = re.compile(r"[^a-z0-9_]+")
 
 
 @dataclass(frozen=True)
@@ -25,12 +27,17 @@ class HourlyStatisticRow:
 
 def statistic_id_for_entry(entry_id: str) -> str:
     """Return the stable external statistic id for a config entry."""
-    return f"custom_components:{DOMAIN}_{entry_id}_electricity_import"
+    return f"{DOMAIN}:{_statistic_object_id(entry_id)}_electricity_import"
 
 
 def cost_statistic_id_for_entry(entry_id: str) -> str:
     """Return the stable external cost statistic id for a config entry."""
     return f"{statistic_id_for_entry(entry_id)}_cost"
+
+
+def _statistic_object_id(entry_id: str) -> str:
+    object_id = _INVALID_STATISTIC_OBJECT_ID.sub("_", entry_id.lower()).strip("_")
+    return object_id or "entry"
 
 
 def build_hourly_statistics(days: list[HourlyUsageDay]) -> list[HourlyStatisticRow]:

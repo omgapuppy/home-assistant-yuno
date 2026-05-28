@@ -157,8 +157,8 @@ The Energy Dashboard data is imported as recorder statistics, not as normal sens
 
 | Statistic | Statistic ID pattern | Unit | Description |
 | --- | --- | --- | --- |
-| Yuno Energy electricity import | `custom_components:yuno_energy_<entry_id>_electricity_import` | kWh | Hourly grid-import consumption from `hourlyUsageInKwh`. |
-| Yuno Energy electricity import cost | `custom_components:yuno_energy_<entry_id>_electricity_import_cost` | EUR | Hourly cost from `hourlyUsageInEuro + hourlyStandingChargeInEuro`. |
+| Yuno Energy electricity import | `yuno_energy:<entry_id>_electricity_import` | kWh | Hourly grid-import consumption from `hourlyUsageInKwh`. |
+| Yuno Energy electricity import cost | `yuno_energy:<entry_id>_electricity_import_cost` | EUR | Hourly cost from `hourlyUsageInEuro + hourlyStandingChargeInEuro`. |
 
 Use the electricity import statistic as **Grid consumption** in **Settings > Dashboards > Energy**. The cost statistic uses Home Assistant's conventional `_cost` suffix for the imported energy statistic so Energy can associate Yuno's supplied euro values with that grid consumption source.
 
