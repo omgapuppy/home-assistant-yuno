@@ -27,6 +27,8 @@
     },
     "error": {
       "cannot_connect": "Yuno login failed. Check the encrypted credentials and static headers.",
+      "bad_response": "Yuno returned an unexpected response. The private API may have changed.",
+      "invalid_auth": "Yuno rejected the encrypted credentials or authorization headers.",
       "missing_basic_auth": "Provide either a Basic Authorization header or a Basic username and password."
     },
     "abort": {
