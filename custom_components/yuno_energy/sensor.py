@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Any
+from typing import Any, cast
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -128,7 +128,7 @@ class YunoEnergySensor(CoordinatorEntity[YunoEnergyCoordinator], SensorEntity):
         self.entity_description = description
         self._attr_unique_id = f"{entry_id}_{description.key}"
         self._attr_translation_key = description.key
-        self._attr_name = description.name
+        self._attr_name = cast(str | None, description.name)
         self._attr_native_unit_of_measurement = description.native_unit_of_measurement
         self._attr_device_class = description.device_class
         self._attr_state_class = description.state_class

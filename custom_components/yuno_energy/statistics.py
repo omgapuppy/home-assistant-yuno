@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 from .const import DOMAIN
@@ -94,14 +94,11 @@ async def async_import_hourly_statistics(
     if not rows:
         return imported_starts, last_sum
 
-    from homeassistant.components.recorder.statistics import (  # noqa: PLC0415
-        StatisticData,
-        StatisticMetaData,
-        async_add_external_statistics,
-    )  # type: ignore[attr-defined]
+    from homeassistant.components.recorder import statistics as recorder_statistics  # noqa: PLC0415
     from homeassistant.const import UnitOfEnergy  # noqa: PLC0415
 
-    metadata = StatisticMetaData(
+    recorder_stats = cast(Any, recorder_statistics)
+    metadata = recorder_stats.StatisticMetaData(
         has_mean=False,
         has_sum=True,
         name="Yuno Energy electricity import",
@@ -109,9 +106,9 @@ async def async_import_hourly_statistics(
         statistic_id=statistic_id_for_entry(entry_id),
         unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     )
-    statistics = [
-        StatisticData(start=row.start, state=row.state, sum=row.sum)
+    statistic_rows = [
+        recorder_stats.StatisticData(start=row.start, state=row.state, sum=row.sum)
         for row in rows
     ]
-    async_add_external_statistics(hass, metadata, statistics)
+    recorder_stats.async_add_external_statistics(hass, metadata, statistic_rows)
     return imported_starts | {row.start.isoformat() for row in rows}, rows[-1].sum
