@@ -7,6 +7,7 @@ Never commit, upload, or share:
 - Raw capture files, HAR files, proxy exports, packet captures, or dumps.
 - `.env` files.
 - Session tokens.
+- `X-Http-sessionToken` values.
 - Encrypted Yuno login payload values.
 - Basic Authorization credentials.
 - PAN, MPRN, account IDs, names, emails, phone numbers, addresses, or payment details.
