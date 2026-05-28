@@ -16,6 +16,29 @@ It uses Yuno's undocumented private mobile-app API. The API can change without n
 
 This repository is not packaged for HACS.
 
+### From a Release Archive
+
+Replace `0.1.0` with the release version you want to install:
+
+```bash
+cd /config
+curl -L https://github.com/omgapuppy/home-assistant-yuno/releases/download/0.1.0/yuno_energy-0.1.0.tar.gz \
+  | tar -xz
+```
+
+The archive expands to `custom_components/yuno_energy`.
+
+Zip archives are also attached to each release:
+
+```bash
+cd /config
+curl -L -o yuno_energy.zip https://github.com/omgapuppy/home-assistant-yuno/releases/download/0.1.0/yuno_energy-0.1.0.zip
+unzip -o yuno_energy.zip
+rm yuno_energy.zip
+```
+
+### From a Local Checkout
+
 1. Copy `custom_components/yuno_energy` into your Home Assistant config directory:
 
    ```text
