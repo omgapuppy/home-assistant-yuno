@@ -7,7 +7,12 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+    SensorStateClass,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CURRENCY_EURO, UnitOfEnergy
 from homeassistant.core import HomeAssistant
@@ -35,32 +40,27 @@ def _freshness_lag(data: dict[str, Any]) -> int | None:
     return (today - latest_date).days
 
 
-@dataclass(frozen=True)
-class SensorDescription:
+@dataclass(frozen=True, kw_only=True)
+class YunoSensorEntityDescription(SensorEntityDescription):
     """Description for a Yuno sensor."""
 
-    key: str
-    name: str
     value_fn: Callable[[dict[str, Any]], Any]
-    native_unit_of_measurement: str | None = None
-    device_class: SensorDeviceClass | None = None
-    state_class: SensorStateClass | None = None
 
 
 SENSORS = [
-    SensorDescription(
+    YunoSensorEntityDescription(
         key="latest_usage_date",
         name="Latest usage date",
         value_fn=lambda data: data["latest_hourly"].date if data.get("latest_hourly") else None,
     ),
-    SensorDescription(
+    YunoSensorEntityDescription(
         key="latest_read_type",
         name="Latest read type",
         value_fn=lambda data: (
             data["latest_hourly"].read_type if data.get("latest_hourly") else None
         ),
     ),
-    SensorDescription(
+    YunoSensorEntityDescription(
         key="yesterday_kwh",
         name="Yesterday usage",
         value_fn=lambda data: _daily_value(data, "usage_kwh"),
@@ -68,7 +68,7 @@ SENSORS = [
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
     ),
-    SensorDescription(
+    YunoSensorEntityDescription(
         key="yesterday_usage_cost_eur",
         name="Yesterday usage cost",
         value_fn=lambda data: _daily_value(data, "usage_eur"),
@@ -76,7 +76,7 @@ SENSORS = [
         device_class=SensorDeviceClass.MONETARY,
         state_class=SensorStateClass.TOTAL,
     ),
-    SensorDescription(
+    YunoSensorEntityDescription(
         key="yesterday_standing_charge_eur",
         name="Yesterday standing charge",
         value_fn=lambda data: _daily_value(data, "standing_charge_eur"),
@@ -84,13 +84,13 @@ SENSORS = [
         device_class=SensorDeviceClass.MONETARY,
         state_class=SensorStateClass.TOTAL,
     ),
-    SensorDescription(
+    YunoSensorEntityDescription(
         key="days_returned",
         name="Days returned",
         value_fn=lambda data: data.get("days_returned"),
         state_class=SensorStateClass.MEASUREMENT,
     ),
-    SensorDescription(
+    YunoSensorEntityDescription(
         key="data_freshness_lag",
         name="Data freshness lag",
         value_fn=_freshness_lag,
@@ -121,9 +121,10 @@ class YunoEnergySensor(CoordinatorEntity[YunoEnergyCoordinator], SensorEntity):
         self,
         coordinator: YunoEnergyCoordinator,
         entry_id: str,
-        description: SensorDescription,
+        description: YunoSensorEntityDescription,
     ) -> None:
         super().__init__(coordinator)
+        self._description = description
         self.entity_description = description
         self._attr_unique_id = f"{entry_id}_{description.key}"
         self._attr_translation_key = description.key
@@ -137,4 +138,4 @@ class YunoEnergySensor(CoordinatorEntity[YunoEnergyCoordinator], SensorEntity):
         """Return sensor state."""
         if not self.coordinator.data:
             return None
-        return self.entity_description.value_fn(self.coordinator.data)
+        return self._description.value_fn(self.coordinator.data)

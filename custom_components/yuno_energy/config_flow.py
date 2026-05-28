@@ -101,6 +101,7 @@ class YunoEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: i
     """Handle a config flow for Yuno Energy."""
 
     VERSION = 1
+    _reauth_entry_id: str | None = None
 
     @staticmethod
     def async_get_options_flow(
@@ -133,7 +134,8 @@ class YunoEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: i
         entry_data: dict[str, Any],
     ) -> config_entries.ConfigFlowResult:
         """Start reauthentication."""
-        self.context["entry_id"] = self.context.get("entry_id")
+        entry_id = self.context.get("entry_id")
+        self._reauth_entry_id = entry_id if isinstance(entry_id, str) else None
         return await self.async_step_reauth_confirm(entry_data)
 
     async def async_step_reauth_confirm(
@@ -141,7 +143,9 @@ class YunoEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: i
         user_input: dict[str, Any] | None = None,
     ) -> config_entries.ConfigFlowResult:
         """Update credentials during reauth."""
-        entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
+        if self._reauth_entry_id is None:
+            return self.async_abort(reason="unknown")
+        entry = self.hass.config_entries.async_get_entry(self._reauth_entry_id)
         defaults = dict(entry.data) if entry else {}
         errors: dict[str, str] = {}
         if user_input is not None:
@@ -161,7 +165,10 @@ class YunoEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: i
         user_input: dict[str, Any] | None = None,
     ) -> config_entries.ConfigFlowResult:
         """Allow reconfiguration of static headers and polling."""
-        entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
+        entry_id = self.context.get("entry_id")
+        if not isinstance(entry_id, str):
+            return self.async_abort(reason="unknown")
+        entry = self.hass.config_entries.async_get_entry(entry_id)
         defaults = dict(entry.data) if entry else {}
         errors: dict[str, str] = {}
         if user_input is not None:

@@ -98,7 +98,7 @@ async def async_import_hourly_statistics(
         StatisticData,
         StatisticMetaData,
         async_add_external_statistics,
-    )
+    )  # type: ignore[attr-defined]
     from homeassistant.const import UnitOfEnergy  # noqa: PLC0415
 
     metadata = StatisticMetaData(
