@@ -73,6 +73,8 @@ jobs:
 
           zip -r "dist/${archive_base}.zip" custom_components/yuno_energy
           tar -czf "dist/${archive_base}.tar.gz" custom_components/yuno_energy
+          cp "dist/${archive_base}.zip" dist/yuno_energy.zip
+          cp "dist/${archive_base}.tar.gz" dist/yuno_energy.tar.gz
 
       - name: Verify release archives
         run: |
@@ -81,8 +83,12 @@ jobs:
 
           test -s "dist/${archive_base}.zip"
           test -s "dist/${archive_base}.tar.gz"
+          test -s dist/yuno_energy.zip
+          test -s dist/yuno_energy.tar.gz
           unzip -l "dist/${archive_base}.zip" | grep -q "custom_components/yuno_energy/manifest.json"
           tar -tzf "dist/${archive_base}.tar.gz" | grep -q "custom_components/yuno_energy/manifest.json"
+          unzip -l dist/yuno_energy.zip | grep -q "custom_components/yuno_energy/manifest.json"
+          tar -tzf dist/yuno_energy.tar.gz | grep -q "custom_components/yuno_energy/manifest.json"
 
       - name: Create git tag
         run: |
@@ -100,4 +106,6 @@ jobs:
             --title "${{ steps.version.outputs.version }}" \
             dist/yuno_energy-${{ steps.version.outputs.version }}.zip \
             dist/yuno_energy-${{ steps.version.outputs.version }}.tar.gz \
+            dist/yuno_energy.zip \
+            dist/yuno_energy.tar.gz \
             --generate-notes

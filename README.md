@@ -18,6 +18,32 @@ This repository is not packaged for HACS.
 
 ### From a Release Archive
 
+#### Latest Release on Home Assistant OS
+
+For Home Assistant OS or Supervised installs, use the **Terminal & SSH** add-on or a similar Home Assistant web terminal.
+
+1. Open **Settings > Add-ons > Add-on Store**.
+2. Install and start **Terminal & SSH** if it is not already installed.
+3. Open the add-on web terminal.
+4. Paste this command:
+
+   ```bash
+   mkdir -p /config && curl -fsSL https://github.com/omgapuppy/home-assistant-yuno/releases/latest/download/yuno_energy.tar.gz | tar -xz -C /config
+   ```
+
+5. Confirm the integration files are present:
+
+   ```bash
+   test -f /config/custom_components/yuno_energy/manifest.json && echo "Yuno Energy installed"
+   ```
+
+6. Restart Home Assistant from **Settings > System > Restart Home Assistant**.
+7. Go to **Settings > Devices & services > Add integration** and search for **Yuno Energy**.
+
+The latest-release URL always points at the newest GitHub release artifact named `yuno_energy.tar.gz`.
+
+#### Specific Version
+
 Replace `0.1.0` with the release version you want to install:
 
 ```bash
