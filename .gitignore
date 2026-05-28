@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Home Assistant/local runtime
+.storage/
+home-assistant.log*
+known_devices.yaml
+
+# Secrets and local config
+.env
+.env.*
+secrets.yaml
+*.secret
+*.pem
+*.key
+
+# Captures and raw API dumps
+captures/
+capture/
+har/
+*.har
+*.pcap
+*.pcapng
+*.mitm
+*.chls
+*.chlsj
+*.raw
+*.dump
+raw/
+Raw_*/
+Raw_*.folder/
+appbillpay.yunoenergy.ie_*.yaml
+
+# OS/editor noise
+.DS_Store
+.idea/
+.vscode/

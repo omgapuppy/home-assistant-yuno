@@ -1,0 +1,11 @@
+{
+  "domain": "yuno_energy",
+  "name": "Yuno Energy",
+  "codeowners": [],
+  "config_flow": true,
+  "documentation": "https://github.com/omgapuppy/home-assistant-yuno",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/omgapuppy/home-assistant-yuno/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

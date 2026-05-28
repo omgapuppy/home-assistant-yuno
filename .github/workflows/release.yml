@@ -1,0 +1,77 @@
+name: Release
+
+on:
+  pull_request:
+    types:
+      - closed
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: >-
+      github.event.pull_request.merged == true &&
+      contains(github.event.pull_request.labels.*.name, 'release')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out merged commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+
+      - name: Read version
+        id: version
+        run: |
+          version="$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          manifest = json.loads(
+              Path("custom_components/yuno_energy/manifest.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          version = manifest.get("version")
+          if not isinstance(version, str) or not version:
+              raise SystemExit("Could not find version in manifest.json")
+          print(version)
+          PY
+          )"
+
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "Read version: ${version}"
+
+      - name: Validate version
+        run: |
+          test -n "${{ steps.version.outputs.version }}" || {
+            echo "Version output is empty" >&2
+            exit 1
+          }
+          echo "Release version: ${{ steps.version.outputs.version }}"
+
+      - name: Check release tag does not exist
+        run: |
+          git fetch --tags origin
+          if git rev-parse --verify --quiet "refs/tags/${{ steps.version.outputs.version }}"; then
+            echo "Tag ${{ steps.version.outputs.version }} already exists" >&2
+            exit 1
+          fi
+
+      - name: Create git tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.version.outputs.version }}" "${{ github.event.pull_request.merge_commit_sha }}"
+          git push origin "${{ steps.version.outputs.version }}"
+
+      - name: Create GitHub release with generated notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.version }}" \
+            --target "${{ github.event.pull_request.merge_commit_sha }}" \
+            --title "${{ steps.version.outputs.version }}" \
+            --generate-notes

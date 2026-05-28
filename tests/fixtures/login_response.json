@@ -1,0 +1,15 @@
+{
+  "sessionToken": "fixture-session-token",
+  "appRegisteredUser": {
+    "active": true,
+    "emailAddress": "fixture@example.invalid",
+    "firstName": "Fixture",
+    "lastName": "User",
+    "userId": 1000
+  },
+  "electricityDetails": {
+    "isActiveElecCustomer": true,
+    "accountStatus": "Active",
+    "tariffName": "Fixture tariff"
+  }
+}

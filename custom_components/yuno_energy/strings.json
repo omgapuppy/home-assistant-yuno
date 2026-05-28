@@ -1,0 +1,36 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Yuno Energy",
+        "description": "Enter the encrypted Yuno mobile-app credentials and static headers captured from your own app traffic.",
+        "data": {
+          "encrypted_email": "Encrypted email",
+          "encrypted_password": "Encrypted password",
+          "basic_authorization": "Basic Authorization header",
+          "basic_username": "Basic username",
+          "basic_password": "Basic password",
+          "origin_id": "X-Http-originid",
+          "login_signature": "Login X-Http-signature",
+          "usage_signature": "Electricity usage X-Http-signature",
+          "scan_interval_minutes": "Polling interval in minutes"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate Yuno Energy",
+        "description": "Update the encrypted credentials or static headers captured from your own app traffic."
+      },
+      "reconfigure": {
+        "title": "Reconfigure Yuno Energy",
+        "description": "Update the encrypted credentials, static headers, or polling interval."
+      }
+    },
+    "error": {
+      "cannot_connect": "Yuno login failed. Check the encrypted credentials and static headers.",
+      "missing_basic_auth": "Provide either a Basic Authorization header or a Basic username and password."
+    },
+    "abort": {
+      "reauth_successful": "Yuno Energy reauthentication succeeded."
+    }
+  }
+}
