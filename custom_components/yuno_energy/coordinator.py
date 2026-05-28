@@ -47,29 +47,49 @@ class YunoEnergyCoordinator(DataUpdateCoordinator[Any]):
             1,
             f"{DOMAIN}_{entry.entry_id}_statistics",
         )
-        self.imported_starts: set[str] = set()
-        self.last_sum = 0.0
+        self.imported_energy_starts: set[str] = set()
+        self.energy_last_sum = 0.0
+        self.imported_cost_starts: set[str] = set()
+        self.cost_last_sum = 0.0
         self.last_update: datetime | None = None
 
     async def _async_update_data(self) -> dict[str, Any]:
         try:
             stored = await self._store.async_load() or {}
-            self.imported_starts = set(cast(list[str], stored.get("imported_starts", [])))
-            self.last_sum = float(stored.get("last_sum", 0.0))
+            self.imported_energy_starts = set(
+                cast(
+                    list[str],
+                    stored.get("imported_energy_starts", stored.get("imported_starts", [])),
+                )
+            )
+            self.energy_last_sum = float(stored.get("energy_last_sum", stored.get("last_sum", 0.0)))
+            self.imported_cost_starts = set(
+                cast(list[str], stored.get("imported_cost_starts", []))
+            )
+            self.cost_last_sum = float(stored.get("cost_last_sum", 0.0))
             auth = auth_config_from_data(dict(self.entry.data))
             login = await self.api.login(auth)
             usage = await self.api.get_electricity_usage(auth, session_token=login.session_token)
-            self.imported_starts, self.last_sum = await async_import_hourly_statistics(
+            (
+                self.imported_energy_starts,
+                self.energy_last_sum,
+                self.imported_cost_starts,
+                self.cost_last_sum,
+            ) = await async_import_hourly_statistics(
                 self.hass,
                 entry_id=self.entry.entry_id,
                 hourly_days=usage.hourly,
-                imported_starts=self.imported_starts,
-                last_sum=self.last_sum,
+                imported_energy_starts=self.imported_energy_starts,
+                energy_last_sum=self.energy_last_sum,
+                imported_cost_starts=self.imported_cost_starts,
+                cost_last_sum=self.cost_last_sum,
             )
             await self._store.async_save(
                 {
-                    "imported_starts": sorted(self.imported_starts),
-                    "last_sum": self.last_sum,
+                    "imported_energy_starts": sorted(self.imported_energy_starts),
+                    "energy_last_sum": self.energy_last_sum,
+                    "imported_cost_starts": sorted(self.imported_cost_starts),
+                    "cost_last_sum": self.cost_last_sum,
                 }
             )
         except YunoApiError as err:

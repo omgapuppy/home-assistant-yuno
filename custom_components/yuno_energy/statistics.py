@@ -28,6 +28,11 @@ def statistic_id_for_entry(entry_id: str) -> str:
     return f"custom_components:{DOMAIN}_{entry_id}_electricity_import"
 
 
+def cost_statistic_id_for_entry(entry_id: str) -> str:
+    """Return the stable external cost statistic id for a config entry."""
+    return f"{statistic_id_for_entry(entry_id)}_cost"
+
+
 def build_hourly_statistics(days: list[HourlyUsageDay]) -> list[HourlyStatisticRow]:
     """Convert Yuno's 24 local wall-clock values per day into hourly statistics.
 
@@ -71,14 +76,52 @@ def build_new_hourly_statistics(
     return rows
 
 
+def build_new_hourly_cost_statistics(
+    days: list[HourlyUsageDay],
+    *,
+    imported_starts: set[str],
+    initial_sum: float,
+) -> list[HourlyStatisticRow]:
+    """Build hourly total-cost statistics that have not already been imported."""
+    rows: list[HourlyStatisticRow] = []
+    cumulative = initial_sum
+    for day in sorted(days, key=lambda item: item.date):
+        if len(day.usage_eur) != 24 or len(day.standing_charge_eur) != 24:
+            continue
+        for hour in range(24):
+            usage_cost = day.usage_eur[hour]
+            standing_charge = day.standing_charge_eur[hour]
+            start = datetime(
+                day.date.year,
+                day.date.month,
+                day.date.day,
+                hour,
+                tzinfo=LOCAL_TZ,
+            )
+            if start.isoformat() in imported_starts:
+                continue
+            cost = round(usage_cost + standing_charge, 6)
+            cumulative = round(cumulative + cost, 6)
+            rows.append(
+                HourlyStatisticRow(
+                    start=start,
+                    state=cost,
+                    sum=cumulative,
+                )
+            )
+    return rows
+
+
 async def async_import_hourly_statistics(
     hass: Any,
     *,
     entry_id: str,
     hourly_days: list[HourlyUsageDay],
-    imported_starts: set[str],
-    last_sum: float,
-) -> tuple[set[str], float]:
+    imported_energy_starts: set[str],
+    energy_last_sum: float,
+    imported_cost_starts: set[str],
+    cost_last_sum: float,
+) -> tuple[set[str], float, set[str], float]:
     """Import new hourly statistics into Home Assistant recorder.
 
     Home Assistant external statistics are keyed by statistic id and start time. This
@@ -86,29 +129,57 @@ async def async_import_hourly_statistics(
     revises a past hour, a future version can compare stored values and call the
     recorder adjustment APIs; the current importer keeps the repeated poll idempotent.
     """
-    rows = build_new_hourly_statistics(
+    energy_rows = build_new_hourly_statistics(
         hourly_days,
-        imported_starts=imported_starts,
-        initial_sum=last_sum,
+        imported_starts=imported_energy_starts,
+        initial_sum=energy_last_sum,
     )
-    if not rows:
-        return imported_starts, last_sum
+    cost_rows = build_new_hourly_cost_statistics(
+        hourly_days,
+        imported_starts=imported_cost_starts,
+        initial_sum=cost_last_sum,
+    )
+    if not energy_rows and not cost_rows:
+        return imported_energy_starts, energy_last_sum, imported_cost_starts, cost_last_sum
 
     from homeassistant.components.recorder import statistics as recorder_statistics  # noqa: PLC0415
     from homeassistant.const import UnitOfEnergy  # noqa: PLC0415
 
     recorder_stats = cast(Any, recorder_statistics)
-    metadata = recorder_stats.StatisticMetaData(
-        has_mean=False,
-        has_sum=True,
-        name="Yuno Energy electricity import",
-        source=STATISTICS_SOURCE,
-        statistic_id=statistic_id_for_entry(entry_id),
-        unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-    )
-    statistic_rows = [
-        recorder_stats.StatisticData(start=row.start, state=row.state, sum=row.sum)
-        for row in rows
-    ]
-    recorder_stats.async_add_external_statistics(hass, metadata, statistic_rows)
-    return imported_starts | {row.start.isoformat() for row in rows}, rows[-1].sum
+    if energy_rows:
+        metadata = recorder_stats.StatisticMetaData(
+            has_mean=False,
+            has_sum=True,
+            name="Yuno Energy electricity import",
+            source=STATISTICS_SOURCE,
+            statistic_id=statistic_id_for_entry(entry_id),
+            unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        )
+        statistic_rows = [
+            recorder_stats.StatisticData(start=row.start, state=row.state, sum=row.sum)
+            for row in energy_rows
+        ]
+        recorder_stats.async_add_external_statistics(hass, metadata, statistic_rows)
+        imported_energy_starts = imported_energy_starts | {
+            row.start.isoformat() for row in energy_rows
+        }
+        energy_last_sum = energy_rows[-1].sum
+
+    if cost_rows:
+        metadata = recorder_stats.StatisticMetaData(
+            has_mean=False,
+            has_sum=True,
+            name="Yuno Energy electricity import cost",
+            source=STATISTICS_SOURCE,
+            statistic_id=cost_statistic_id_for_entry(entry_id),
+            unit_of_measurement="EUR",
+        )
+        statistic_rows = [
+            recorder_stats.StatisticData(start=row.start, state=row.state, sum=row.sum)
+            for row in cost_rows
+        ]
+        recorder_stats.async_add_external_statistics(hass, metadata, statistic_rows)
+        imported_cost_starts = imported_cost_starts | {row.start.isoformat() for row in cost_rows}
+        cost_last_sum = cost_rows[-1].sum
+
+    return imported_energy_starts, energy_last_sum, imported_cost_starts, cost_last_sum
