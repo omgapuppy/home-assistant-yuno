@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Protocol
 
 from .models import DailyUsage, HourlyUsageDay
@@ -288,7 +288,10 @@ def _date_value(value: object, field: str) -> date:
     try:
         return date.fromisoformat(value)
     except ValueError as err:
-        raise YunoApiError(f"usage fetch failed: {field} was not ISO formatted") from err
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00")).date()
+        except ValueError:
+            raise YunoApiError(f"usage fetch failed: {field} was not ISO formatted") from err
 
 
 def _optional_str(value: object) -> str | None:

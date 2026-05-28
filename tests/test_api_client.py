@@ -132,6 +132,33 @@ async def test_usage_request_sends_session_token_and_parses_hourly_arrays() -> N
 
 
 @pytest.mark.asyncio
+async def test_usage_parser_accepts_yuno_iso_datetime_dates() -> None:
+    class DatetimeDateSession(FakeSession):
+        async def get(self, url: str, *, headers: dict[str, str]) -> FakeResponse:
+            payload = json_fixture("electricity_usage.json")
+            hourly = cast(list[dict[str, object]], payload["hourlyUsageDetails"])
+            daily = cast(list[dict[str, object]], payload["dailyUsageDetails"])
+            hourly[0]["date"] = "2026-05-26T00:00:00"
+            daily[0]["date"] = "2026-05-26T00:00:00"
+            return FakeResponse(200, payload)
+
+    client = YunoApiClient(session=DatetimeDateSession())
+    auth = AuthConfig(
+        encrypted_email="encrypted-email",
+        encrypted_password="encrypted-password",
+        basic_authorization="Basic fixture",
+        origin_id="64",
+        login_signature="login-signature",
+        usage_signature="usage-signature",
+    )
+
+    result = await client.get_electricity_usage(auth, session_token="fixture-session")
+
+    assert result.hourly[0].date.isoformat() == "2026-05-26"
+    assert result.daily[0].date.isoformat() == "2026-05-26"
+
+
+@pytest.mark.asyncio
 async def test_raises_auth_error_for_unauthorized_response() -> None:
     class UnauthorizedSession(FakeSession):
         async def post(
