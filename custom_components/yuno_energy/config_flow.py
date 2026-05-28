@@ -23,6 +23,7 @@ from .const import (
     DOMAIN,
     MIN_SCAN_INTERVAL_MINUTES,
 )
+from .flow_errors import error_key_from_exception
 from .yuno_api.client import AiohttpSessionAdapter, AuthConfig, YunoApiClient, YunoApiError
 
 _LOGGER = logging.getLogger(__name__)
@@ -191,9 +192,9 @@ class YunoEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: i
         )
         try:
             await client.login(auth_config_from_data(user_input))
-        except (YunoApiError, TimeoutError, OSError):
+        except (YunoApiError, TimeoutError, OSError) as err:
             _LOGGER.debug("Yuno login validation failed", exc_info=True)
-            return {"base": "cannot_connect"}
+            return {"base": error_key_from_exception(err)}
         return {}
 
 

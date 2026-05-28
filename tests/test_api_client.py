@@ -74,8 +74,11 @@ async def test_login_posts_encrypted_credentials_with_static_headers() -> None:
             "https://appbillpay.yunoenergy.ie:2015/api/login",
             {
                 "headers": {
+                    "Accept": "application/json",
+                    "Accept-Language": "en-IE,en;q=0.9",
                     "Authorization": "Basic fixture",
                     "Content-Type": "application/json",
+                    "User-Agent": "YunoEnergyHomeAssistant/0.1",
                     "X-Http-originid": "64",
                     "X-Http-signature": "login-signature",
                 },
@@ -115,8 +118,11 @@ async def test_usage_request_sends_session_token_and_parses_hourly_arrays() -> N
         "https://appbillpay.yunoenergy.ie:2015/api/bill/electricityUsage",
         {
             "headers": {
+                "Accept": "application/json",
+                "Accept-Language": "en-IE,en;q=0.9",
                 "Authorization": "Basic fixture",
                 "Content-Type": "application/json",
+                "User-Agent": "YunoEnergyHomeAssistant/0.1",
                 "X-Http-originid": "64",
                 "X-Http-sessionToken": "fixture-session",
                 "X-Http-signature": "usage-signature",
