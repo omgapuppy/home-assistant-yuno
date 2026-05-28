@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.5
+
+- Use Home Assistant-valid external statistic IDs for recorder imports.
+- Align recorder statistic metadata source with the `yuno_energy` statistic ID domain.
+
 ## 0.1.4
 
 - Accept Yuno date fields returned as ISO datetimes such as `2026-05-27T00:00:00`.
