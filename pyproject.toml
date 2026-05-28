@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "home-assistant-yuno"
-version = "0.1.1"
+version = "0.1.2"
 description = "Home Assistant custom integration for Yuno Energy Ireland"
 readme = "README.md"
 requires-python = ">=3.12"
