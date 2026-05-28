@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4
+
+- Accept Yuno date fields returned as ISO datetimes such as `2026-05-27T00:00:00`.
+
 ## 0.1.3
 
 - Surface sanitized config-flow failure details in the Home Assistant UI and logs.
