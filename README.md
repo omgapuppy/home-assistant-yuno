@@ -9,6 +9,7 @@ It uses Yuno's undocumented private mobile-app API. The API can change without n
 - Config flow setup under Home Assistant settings.
 - Polls `GET /api/bill/electricityUsage`.
 - Imports hourly kWh usage into Home Assistant recorder statistics for Energy Dashboard use.
+- Imports Yuno hourly euro cost as a companion Energy Dashboard cost statistic.
 - Exposes regular sensors for latest usage date, latest read type, yesterday usage, yesterday cost, standing charge, returned day count, and data lag.
 - Stores credentials and static headers in the Home Assistant config entry. They are not logged by the integration.
 
@@ -115,6 +116,47 @@ The integration imports hourly usage from `hourlyUsageDetails` as Home Assistant
 Yuno returns a 24-value array for each date in the observed API shape. The integration maps index `0..23` to local Europe/Dublin wall-clock hours for that date. On DST transition dates this preserves the app's indexing instead of inventing or dropping an hour, because the API does not expose a per-hour UTC offset. Normal 24-hour days are covered by tests.
 
 The importer tracks timestamps already imported for the config entry to avoid repeated imports during polling. If Yuno revises already-imported historical values, the current version does not attempt recorder statistic adjustment beyond avoiding duplicate unchanged rows.
+
+### Energy Statistics
+
+The Energy Dashboard data is imported as recorder statistics, not as normal sensor entities:
+
+| Statistic | Statistic ID pattern | Unit | Description |
+| --- | --- | --- | --- |
+| Yuno Energy electricity import | `custom_components:yuno_energy_<entry_id>_electricity_import` | kWh | Hourly grid-import consumption from `hourlyUsageInKwh`. |
+| Yuno Energy electricity import cost | `custom_components:yuno_energy_<entry_id>_electricity_import_cost` | EUR | Hourly cost from `hourlyUsageInEuro + hourlyStandingChargeInEuro`. |
+
+Use the electricity import statistic as **Grid consumption** in **Settings > Dashboards > Energy**. The cost statistic uses Home Assistant's conventional `_cost` suffix for the imported energy statistic so Energy can associate Yuno's supplied euro values with that grid consumption source.
+
+This means Yuno can act as a whole-home electricity meter with backfilled hourly kWh and cost data. The cost statistic includes the hourly standing charge values returned by Yuno, so Energy Dashboard cost totals should be closer to Yuno's daily totals than a unit-rate-only calculation. Home Assistant does not show the standing charge as a separate Energy Dashboard cost component; use the normal standing charge sensor below for that breakdown.
+
+### Exposed Sensors
+
+These are normal Home Assistant sensor entities created by the integration. Entity IDs are assigned by Home Assistant from the entity names and can be renamed in the UI.
+
+| Sensor name | Unique ID suffix | Unit | Device class | State class | Notes |
+| --- | --- | --- | --- | --- | --- |
+| Latest usage date | `latest_usage_date` | none | none | none | Latest date present in `hourlyUsageDetails`. |
+| Latest read type | `latest_read_type` | none | none | none | Read type for the latest hourly day, for example `Actual`. |
+| Yesterday usage | `yesterday_kwh` | kWh | energy | total | Latest daily kWh value from `dailyUsageDetails`. |
+| Yesterday usage cost | `yesterday_usage_cost_eur` | EUR | monetary | total | Latest daily usage cost, excluding standing charge. |
+| Yesterday standing charge | `yesterday_standing_charge_eur` | EUR | monetary | total | Latest daily standing charge. |
+| Days returned | `days_returned` | none | none | measurement | Count of hourly days returned by the API. |
+| Data freshness lag | `data_freshness_lag` | d | none | measurement | Difference between today and the latest Yuno usage date. |
+
+### Coverage Compared With MQTT Accumulators
+
+Compared with an MQTT accumulator such as `esbn-to-mqtt`, this integration does not need to synthesize a live monotonically increasing meter from each poll. Yuno returns historical hourly arrays, so the integration backfills Home Assistant recorder statistics directly.
+
+Current coverage:
+
+- Whole-home grid-import kWh: yes, via hourly external statistics.
+- Historical backfill: yes, for the rolling date window returned by Yuno.
+- Yuno-provided usage cost: yes, via a companion `_cost` external statistic.
+- Yuno-provided standing charge: included in the imported Energy cost statistic and also exposed as a normal daily sensor.
+- Export/feed-in: no; the captured Yuno electricity usage endpoint does not expose export arrays.
+- Live power/current interval telemetry: no; Yuno provides historical hourly usage, not real-time W/kW.
+- Revised historical values: not fully handled yet; duplicate timestamps are skipped, but already-imported values are not adjusted if Yuno later revises them.
 
 ## Troubleshooting
 
