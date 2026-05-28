@@ -43,6 +43,16 @@ For Home Assistant OS or Supervised installs, use the **Terminal & SSH** add-on 
 
 The latest-release URL always points at the newest GitHub release artifact named `yuno_energy.tar.gz`.
 
+#### Updating an Existing Install
+
+To update from Home Assistant OS or Supervised, replace the existing integration directory with the latest release archive, then restart Home Assistant:
+
+```bash
+cd /config/custom_components && rm -rf yuno_energy && curl -fsSL https://github.com/omgapuppy/home-assistant-yuno/releases/latest/download/yuno_energy.tar.gz | tar -xz
+```
+
+Your Yuno Energy config entry and captured field values are stored by Home Assistant, not inside `/config/custom_components/yuno_energy`, so replacing the integration files does not remove the integration setup. Restart Home Assistant from **Settings > System > Restart Home Assistant** after updating.
+
 #### Specific Version
 
 Replace `0.1.0` with the release version you want to install:
