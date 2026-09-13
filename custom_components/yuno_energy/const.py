@@ -22,3 +22,8 @@ CONF_LOGIN_SIGNATURE = "login_signature"
 CONF_USAGE_SIGNATURE = "usage_signature"
 CONF_SESSION_TOKEN = "session_token"
 CONF_SCAN_INTERVAL_MINUTES = "scan_interval_minutes"
+
+CONF_AUTH_MODE = "auth_mode"
+AUTH_MODE_ACCOUNT = "account"
+CONF_EMAIL = "email"
+CONF_PASSWORD = "password"

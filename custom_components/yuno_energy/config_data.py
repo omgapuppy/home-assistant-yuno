@@ -5,13 +5,18 @@ from __future__ import annotations
 from typing import Any
 
 from .const import (
+    AUTH_MODE_ACCOUNT,
+    CONF_AUTH_MODE,
     CONF_BASIC_AUTHORIZATION,
     CONF_BASIC_PASSWORD,
     CONF_BASIC_USERNAME,
+    CONF_EMAIL,
     CONF_ENCRYPTED_EMAIL,
     CONF_ENCRYPTED_PASSWORD,
     CONF_LOGIN_SIGNATURE,
     CONF_ORIGIN_ID,
+    CONF_PASSWORD,
+    CONF_SCAN_INTERVAL_MINUTES,
     CONF_SESSION_TOKEN,
     CONF_USAGE_SIGNATURE,
     DEFAULT_ORIGIN_ID,
@@ -21,6 +26,11 @@ from .yuno_api.client import AuthConfig
 
 def auth_config_from_data(data: dict[str, Any]) -> AuthConfig:
     """Build AuthConfig from config entry data."""
+    if data.get(CONF_AUTH_MODE) == AUTH_MODE_ACCOUNT:
+        return AuthConfig.from_encrypted_credentials(
+            _string_value(data, CONF_ENCRYPTED_EMAIL),
+            _string_value(data, CONF_ENCRYPTED_PASSWORD),
+        )
     basic_authorization = _string_value(data, CONF_BASIC_AUTHORIZATION)
     if basic_authorization:
         if not basic_authorization.lower().startswith("basic "):
@@ -48,10 +58,7 @@ def has_basic_auth(data: dict[str, Any]) -> bool:
     """Return whether Basic auth can be built."""
     return bool(
         _string_value(data, CONF_BASIC_AUTHORIZATION)
-        or (
-            _string_value(data, CONF_BASIC_USERNAME)
-            and _string_value(data, CONF_BASIC_PASSWORD)
-        )
+        or (_string_value(data, CONF_BASIC_USERNAME) and _string_value(data, CONF_BASIC_PASSWORD))
     )
 
 
@@ -60,7 +67,10 @@ def has_login_credentials(data: dict[str, Any]) -> bool:
     return bool(
         _string_value(data, CONF_ENCRYPTED_EMAIL)
         and _string_value(data, CONF_ENCRYPTED_PASSWORD)
-        and _string_value(data, CONF_LOGIN_SIGNATURE)
+        and (
+            data.get(CONF_AUTH_MODE) == AUTH_MODE_ACCOUNT
+            or _string_value(data, CONF_LOGIN_SIGNATURE)
+        )
     )
 
 
@@ -72,3 +82,15 @@ def session_token_from_data(data: dict[str, Any]) -> str:
 def _string_value(data: dict[str, Any], key: str) -> str:
     value = data.get(key)
     return str(value).strip() if value is not None else ""
+
+
+def account_data_from_input(data: dict[str, Any]) -> dict[str, Any]:
+    """Convert form credentials to stored app values, discarding the password."""
+    email = str(data.get(CONF_EMAIL, "")).strip().lower()
+    auth = AuthConfig.from_account_credentials(email, str(data.get(CONF_PASSWORD, "")))
+    return {
+        **auth.setup_values(),
+        CONF_AUTH_MODE: AUTH_MODE_ACCOUNT,
+        CONF_EMAIL: email,
+        CONF_SCAN_INTERVAL_MINUTES: data.get(CONF_SCAN_INTERVAL_MINUTES, 360),
+    }

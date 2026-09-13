@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from .yuno_api.client import YunoApiError
+from .yuno_api.client import YunoApiError, YunoAuthenticationError, YunoConnectionError
 
 _SECRET_ASSIGNMENT = re.compile(
     r"(?i)\b("
@@ -17,6 +17,10 @@ _BASIC_VALUE = re.compile(r"(?i)\bBasic\s+[A-Za-z0-9+/=._:-]+")
 
 def error_key_from_exception(err: Exception) -> str:
     """Map internal exceptions to Home Assistant config-flow error keys."""
+    if isinstance(err, YunoAuthenticationError):
+        return "invalid_auth"
+    if isinstance(err, YunoConnectionError):
+        return "cannot_connect"
     if isinstance(err, YunoApiError):
         message = str(err)
         if "response" in message or "payload" in message or "usage fetch failed" in message:

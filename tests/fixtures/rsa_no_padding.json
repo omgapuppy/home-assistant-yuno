@@ -1,0 +1,18 @@
+[
+  {
+    "plaintext": "offline@example.invalid",
+    "ciphertext": "TJ7DFC8T+FsUCOQRsoaImV33eEdvYdkxFSrZ4oqqQnEMkmU5Gx76hSCILux59P/Ry8wO0ojY0HG/hg7+xypT8Q=="
+  },
+  {
+    "plaintext": "synthetic-\u20ac-password ",
+    "ciphertext": "jJyU/xxFRkirY1QXcGKXR94PuToSwe7wv6vkSNm6ruw0VEFO90tjdpptfRHqkBYxgiq+PSBh5WpOqSk1HRIAZw=="
+  },
+  {
+    "plaintext": "",
+    "ciphertext": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+  },
+  {
+    "plaintext": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "ciphertext": "V5KaycCECv6H9z9ayesHGDlqdRgPJaj4m1Uf2dFrS/AjzshHbYTKC+jNLBtL/VjO9f7+wKeNhD13YhmvT9Qi3g=="
+  }
+]

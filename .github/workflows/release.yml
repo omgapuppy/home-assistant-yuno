@@ -64,14 +64,13 @@ jobs:
         run: |
           version="${{ steps.version.outputs.version }}"
           archive_base="yuno_energy-${version}"
-          mkdir -p dist
+          python3 scripts/build_artifacts.py
 
           test -f custom_components/yuno_energy/manifest.json || {
             echo "custom_components/yuno_energy/manifest.json is missing" >&2
             exit 1
           }
 
-          zip -r "dist/${archive_base}.zip" custom_components/yuno_energy
           tar -czf "dist/${archive_base}.tar.gz" custom_components/yuno_energy
           cp "dist/${archive_base}.zip" dist/yuno_energy.zip
           cp "dist/${archive_base}.tar.gz" dist/yuno_energy.tar.gz
@@ -81,6 +80,8 @@ jobs:
           version="${{ steps.version.outputs.version }}"
           archive_base="yuno_energy-${version}"
 
+          test -s dist/yuno-setup.pyz
+          python3 dist/yuno-setup.pyz --help
           test -s "dist/${archive_base}.zip"
           test -s "dist/${archive_base}.tar.gz"
           test -s dist/yuno_energy.zip
@@ -106,6 +107,7 @@ jobs:
             --title "${{ steps.version.outputs.version }}" \
             dist/yuno_energy-${{ steps.version.outputs.version }}.zip \
             dist/yuno_energy-${{ steps.version.outputs.version }}.tar.gz \
+            dist/yuno-setup.pyz \
             dist/yuno_energy.zip \
             dist/yuno_energy.tar.gz \
             --generate-notes

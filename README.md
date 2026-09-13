@@ -1,147 +1,85 @@
 # Home Assistant Yuno Energy
 
-`yuno_energy` is a personal Home Assistant custom integration for importing Yuno Energy Ireland electricity usage into Home Assistant.
+Sign in with your Yuno Energy email and password to import electricity usage and
+costs into Home Assistant. No proxy, phone capture, or copied headers are needed.
 
-It uses Yuno's undocumented private mobile-app API. The API can change without notice, and this project is not affiliated with or endorsed by Yuno Energy. Install it only if you are comfortable maintaining captured mobile-app header values for your own account.
+This custom integration imports Energy Dashboard statistics and sensors using
+Yuno's undocumented mobile API. It supports account login, automatic session
+renewal, and manual setup. It is not a Supervisor add-on and is not affiliated
+with Yuno Energy.
 
-## Features
+## Install and sign in
 
-- Config flow setup under Home Assistant settings.
-- Polls `GET /api/bill/electricityUsage`.
-- Imports hourly kWh usage into Home Assistant recorder statistics for Energy Dashboard use.
-- Imports Yuno hourly euro cost as a companion Energy Dashboard cost statistic.
-- Exposes regular sensors for latest usage date, latest read type, yesterday usage, yesterday cost, standing charge, returned day count, and data lag.
-- Stores credentials and static headers in the Home Assistant config entry. They are not logged by the integration.
+1. Download this repository using **Code → Download ZIP**.
+2. Copy `custom_components/yuno_energy` into Home Assistant's
+   `/config/custom_components/` directory, replacing that directory if upgrading.
+3. Restart Home Assistant.
+4. Go to **Settings → Devices & services → Add integration → Yuno Energy**.
+5. Choose **Sign in with email and password**, enter your Yuno credentials, and
+   submit. The default polling interval is six hours; the minimum is 30 minutes.
 
-## Manual Installation
+The integration checks login and electricity usage access before saving the entry.
+It saves reusable encrypted app credentials and the session token, without
+retaining the plain password. These values still grant account access: protect
+Home Assistant's configuration and backups. Sessions are reused across polls and
+restarts. An expired session triggers at most one login and one retry of the usage
+request. Rejected login credentials prompt reauthentication; network failures and
+server errors do not trigger extra login attempts.
 
-This repository is not packaged for HACS.
+### Existing installations
 
-### From a Release Archive
+Replace the integration files and restart Home Assistant. Existing entries using
+captured tokens or replay-login values continue to work.
 
-#### Latest Release on Home Assistant OS
+To switch an existing entry to email/password login, use its **Reconfigure** menu
+and choose **Sign in with email and password**. This updates the same config entry,
+so its statistics and entity IDs are retained. Polling options are also retained;
+change them using **Configure** if needed. Do not create a second entry or delete
+your existing entry to change credentials.
 
-For Home Assistant OS or Supervised installs, use the **Terminal & SSH** add-on or a similar Home Assistant web terminal.
+## Helper for manual setup
 
-1. Open **Settings > Add-ons > Add-on Store**.
-2. Install and start **Terminal & SSH** if it is not already installed.
-3. Open the add-on web terminal.
-4. Paste this command:
+For manual setup or an older installation, run this helper from a checkout
+using Python 3.12 or newer. It uses only the standard library:
 
-   ```bash
-   mkdir -p /config && curl -fsSL https://github.com/omgapuppy/home-assistant-yuno/releases/latest/download/yuno_energy.tar.gz | tar -xz -C /config
-   ```
-
-5. Confirm the integration files are present:
-
-   ```bash
-   test -f /config/custom_components/yuno_energy/manifest.json && echo "Yuno Energy installed"
-   ```
-
-6. Restart Home Assistant from **Settings > System > Restart Home Assistant**.
-7. Go to **Settings > Devices & services > Add integration** and search for **Yuno Energy**.
-
-The latest-release URL always points at the newest GitHub release artifact named `yuno_energy.tar.gz`.
-
-#### Updating an Existing Install
-
-To update from Home Assistant OS or Supervised, replace the existing integration directory with the latest release archive, then restart Home Assistant:
-
-```bash
-cd /config/custom_components && rm -rf yuno_energy && curl -fsSL https://github.com/omgapuppy/home-assistant-yuno/releases/latest/download/yuno_energy.tar.gz | tar -xz
+```sh
+python3 scripts/yuno_setup.py --output yuno-setup.json
 ```
 
-Your Yuno Energy config entry and captured field values are stored by Home Assistant, not inside `/config/custom_components/yuno_energy`, so replacing the integration files does not remove the integration setup. Restart Home Assistant from **Settings > System > Restart Home Assistant** after updating.
+Enter your email and password at the prompts. Password input is hidden. By
+default, the helper computes the six setup fields **offline**; it makes no Yuno
+requests. It uses the same encryption and signing code as the integration.
 
-#### Specific Version
+To also obtain a session token with one login request:
 
-Replace `0.1.0` with the release version you want to install:
-
-```bash
-cd /config
-curl -L https://github.com/omgapuppy/home-assistant-yuno/releases/download/0.1.0/yuno_energy-0.1.0.tar.gz \
-  | tar -xz
+```sh
+python3 scripts/yuno_setup.py --login --output yuno-setup.json
 ```
 
-The archive expands to `custom_components/yuno_energy`.
+Use a new output filename each time; existing files are never overwritten. Files
+are created with owner-only permissions. Omitting `--output` prints the fields to
+standard output. The `YUNO_EMAIL` and `YUNO_PASSWORD` environment variables can be
+used for noninteractive runs. Do not publish the output or include it in logs.
 
-Zip archives are also attached to each release:
+Copy the resulting JSON values into the original integration's setup fields:
 
-```bash
-cd /config
-curl -L -o yuno_energy.zip https://github.com/omgapuppy/home-assistant-yuno/releases/download/0.1.0/yuno_energy-0.1.0.zip
-unzip -o yuno_energy.zip
-rm yuno_energy.zip
-```
+| JSON key | Home Assistant field |
+| --- | --- |
+| `encrypted_email` | Encrypted email |
+| `encrypted_password` | Encrypted password |
+| `basic_authorization` | Basic Authorization header |
+| `origin_id` | X-Http-originid |
+| `login_signature` | Login X-Http-signature |
+| `usage_signature` | Electricity usage X-Http-signature |
+| `session_token` (with `--login`) | X-Http-sessionToken |
 
-### From a Local Checkout
+Leave Basic username/password blank when providing the full Basic Authorization
+header. These generated values use Android origin `63` regardless of which phone
+you use. The account is the same across platforms. The helper's login signature
+covers the JSON formatting used by the original integration.
 
-1. Copy `custom_components/yuno_energy` into your Home Assistant config directory:
-
-   ```text
-   /config/custom_components/yuno_energy
-   ```
-
-2. Restart Home Assistant.
-3. Go to **Settings > Devices & services > Add integration**.
-4. Search for **Yuno Energy**.
-5. Enter the fields captured from your own Yuno mobile app traffic.
-
-## Required Fields
-
-The Yuno API uses static Basic client auth, static per-endpoint signatures, `X-Http-originid`, and an app-level session token returned by login.
-
-There are two setup modes:
-
-- **Session-token mode** is currently the most reliable path. It uses the app session token already issued to your Yuno app.
-- **Replay-login mode** tries to call `POST /api/login` using the encrypted login body captured from the app. Yuno may reject old encrypted login payloads even while an existing app session token continues to work.
-
-### Recommended: Session-Token Mode
-
-Copy these fields from a successful `GET /api/bill/electricityUsage` request:
-
-| Capture value | Integration field | Copy rule |
-| --- | --- | --- |
-| `Authorization: Basic abc123...` | **Basic Authorization header** | Copy the full value after the first colon: `Basic abc123...`. Keep the `Basic ` prefix. |
-| `X-Http-originid: 64` | **X-Http-originid** | Copy `64`. |
-| `X-Http-signature: 64:a1b868...` | **Electricity usage X-Http-signature** | Copy `64:a1b868...`. Keep the `64:` prefix if it is present. |
-| `X-Http-sessionToken: eyJ...` | **X-Http-sessionToken** | Copy only the token value after the first colon. Do not include `X-Http-sessionToken:`. |
-
-You can leave **Encrypted email**, **Encrypted password**, and **Login X-Http-signature** blank when using session-token mode.
-
-### Optional Fallback: Replay-Login Mode
-
-If you also want the integration to try a fresh login when the configured session token expires, copy these additional fields from `POST /api/login`:
-
-| Capture value | Integration field | Copy rule |
-| --- | --- | --- |
-| JSON body `"email": "..."` | **Encrypted email** | Copy the encrypted string value only, without JSON quotes. |
-| JSON body `"password": "..."` | **Encrypted password** | Copy the encrypted string value only, without JSON quotes. |
-| `X-Http-signature: 64:121eed...` | **Login X-Http-signature** | Copy `64:121eed...`. Keep the `64:` prefix if it is present. |
-
-If you do not provide **X-Http-sessionToken**, those three replay-login fields become required. You still need **Basic Authorization header**, **X-Http-originid**, and **Electricity usage X-Http-signature** because the integration must fetch usage after login.
-
-### Field Copying Rules
-
-- Copy header values, not header names. For example, from `X-Http-signature: 64:abc`, enter `64:abc`.
-- Keep prefixes that are part of the value. `Basic ` and `64:` are part of the values seen in captures.
-- Do not add quotes around copied values in the Home Assistant form.
-- Do not paste whole request or response bodies into issues, logs, or screenshots.
-- Prefer copying `X-Http-sessionToken` from the `GET /api/bill/electricityUsage` request header. The `sessionToken` value in a login response is also sensitive, but the request header is the exact value the integration needs.
-
-## Capturing Your Own Values
-
-You need to capture traffic from your own iPhone and Yuno app using a TLS debugging proxy such as Proxyman, Charles, or mitmproxy.
-
-Typical flow:
-
-1. Install and trust the proxy certificate on your iPhone.
-2. Configure the iPhone Wi-Fi HTTP proxy to point at your computer.
-3. Open the Yuno app and sign in.
-4. Locate the `POST /api/login` request and the `GET /api/bill/electricityUsage` request.
-5. Copy only the fields listed above into Home Assistant.
-
-Do not publish or share captures. They may contain real session tokens, encrypted credentials, account identifiers, contact details, MPRN/PAN/account IDs, and payment details. If interception stops working because the app changes its transport protections, do not patch the app, bypass certificate pinning, defeat attestation, or modify binaries for this integration.
+The helper only outputs configuration values. The Home Assistant flow
+also checks electricity usage access before it saves an entry.
 
 ## Energy Dashboard
 
@@ -194,23 +132,39 @@ Current coverage:
 
 ## Troubleshooting
 
-Login failures in replay-login mode usually mean one of the encrypted credential values, Basic auth value, origin id, or login signature has changed or expired. Capture a fresh login from your own app and update the integration entry.
-
-Session-token failures usually mean the app session expired or the electricity usage signature changed. Capture a fresh `GET /api/bill/electricityUsage` request and update **X-Http-sessionToken** and **Electricity usage X-Http-signature**.
-
-Stale data normally means Yuno has not published newer smart-meter usage yet. Check the latest usage date and data freshness lag sensors.
-
-Signature errors can happen if Yuno updates the mobile app or server-side validation. Capture fresh values from the current app version and update both signature fields.
-
-If the Energy Dashboard does not show data, confirm the integration has completed at least one successful poll and that Home Assistant recorder is enabled.
+- **Login rejected:** verify the same credentials in the official Yuno app, then
+  use Home Assistant's reauthentication form. Do not repeatedly resubmit a failing
+  password. The integration treats Yuno error 1004 as rejected credentials.
+- **Network or server error:** the integration will retry its normal poll later;
+  these failures do not cause an additional login.
+- **Unexpected response:** Yuno may have changed its undocumented API. Check for
+  an updated version of the integration. Do not attach raw responses or setup values to
+  public issues.
+- **Existing manual setup has expired:** use Reconfigure to switch to account
+  login, or generate fresh values with the helper.
+- **Stale usage:** Yuno may not yet have published new smart-meter readings. Check
+  the latest usage date and data freshness lag sensors.
 
 ## Development
 
-Tests use sanitized fixtures and mocks. They must not call live Yuno endpoints.
-
-```bash
+```sh
 python -m pip install -e ".[dev]"
 ruff check .
-mypy custom_components tests
+mypy custom_components tests scripts
 pytest
 ```
+
+Tests use synthetic encryption vectors and mocked API responses, and must not
+call live Yuno endpoints. They cover the Home Assistant forms, session renewal
+and persistence, error handling, and the standalone helper. See
+[authentication notes](docs/authentication.md) for the protocol and its validation.
+
+Build an installable integration ZIP and a single-file helper:
+
+```sh
+python3 scripts/build_artifacts.py
+python3 dist/yuno-setup.pyz --help
+```
+
+The ZIP expands to `custom_components/yuno_energy/`. The `.pyz` helper can be copied
+and run on its own with Python 3.12+, without installing Home Assistant.

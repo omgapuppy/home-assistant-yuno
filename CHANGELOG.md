@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Add email/password setup using the verified Android login format, with no proxy capture.
+- Save encrypted app credentials and session tokens without retaining the plain password.
+- Renew expired sessions once and persist replacements across polls and restarts.
+- Add reauthentication and migration from manual setup while preserving config entry IDs.
+- Keep existing captured-token and replay-login configurations supported.
+- Add a standard-library setup helper for the original integration, with optional single login.
+- Add offline encryption, HTTP serialization, config-flow and session lifecycle tests.
+
 ## 0.1.6
 
 - Group Yuno sensor entities under a Home Assistant device for the config entry.

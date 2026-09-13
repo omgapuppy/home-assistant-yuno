@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import base64
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any, Protocol
 
+from .auth import AuthConfig as AuthConfig
 from .models import DailyUsage, HourlyUsageDay
 
 
@@ -29,7 +29,8 @@ class SessionProtocol(Protocol):
         url: str,
         *,
         headers: dict[str, str],
-        json: dict[str, object],
+        json: dict[str, object] | None = None,
+        data: bytes | None = None,
     ) -> ResponseProtocol:
         """POST a JSON request."""
 
@@ -37,42 +38,7 @@ class SessionProtocol(Protocol):
         """GET a JSON response."""
 
 
-@dataclass(frozen=True)
-class AuthConfig:
-    """Secret and static header configuration for Yuno API requests."""
-
-    encrypted_email: str
-    encrypted_password: str
-    basic_authorization: str
-    origin_id: str
-    login_signature: str
-    usage_signature: str
-
-    @classmethod
-    def from_basic_credentials(
-        cls,
-        *,
-        encrypted_email: str,
-        encrypted_password: str,
-        basic_username: str,
-        basic_password: str,
-        origin_id: str,
-        login_signature: str,
-        usage_signature: str,
-    ) -> AuthConfig:
-        """Build an auth config from Basic username/password fields."""
-        raw = f"{basic_username}:{basic_password}".encode()
-        return cls(
-            encrypted_email=encrypted_email,
-            encrypted_password=encrypted_password,
-            basic_authorization=f"Basic {base64.b64encode(raw).decode()}",
-            origin_id=origin_id,
-            login_signature=login_signature,
-            usage_signature=usage_signature,
-        )
-
-
-@dataclass(frozen=True)
+@dataclass(frozen=True, repr=False)
 class LoginResult:
     """Parsed login result."""
 
@@ -91,6 +57,14 @@ class YunoApiError(Exception):
     """Raised when the Yuno API returns an error or unexpected payload."""
 
 
+class YunoAuthenticationError(YunoApiError):
+    """Raised when credentials or an issued session are rejected."""
+
+
+class YunoConnectionError(YunoApiError):
+    """Raised when the HTTP transport fails."""
+
+
 class AiohttpSessionAdapter:
     """Adapter that exposes aiohttp's context-manager API as simple methods."""
 
@@ -102,22 +76,35 @@ class AiohttpSessionAdapter:
         url: str,
         *,
         headers: dict[str, str],
-        json: dict[str, object],
+        json: dict[str, object] | None = None,
+        data: bytes | None = None,
     ) -> ResponseProtocol:
-        async with self._session.post(url, headers=headers, json=json) as response:
-            try:
-                payload = await response.json(content_type=None)
-            except ValueError:
-                payload = None
-            return AiohttpResponseAdapter(response.status, payload)
+        kwargs = {"data": data} if data is not None else {"json": json}
+        return await self._request("post", url, headers, **kwargs)
 
     async def get(self, url: str, *, headers: dict[str, str]) -> ResponseProtocol:
-        async with self._session.get(url, headers=headers) as response:
-            try:
-                payload = await response.json(content_type=None)
-            except ValueError:
-                payload = None
-            return AiohttpResponseAdapter(response.status, payload)
+        return await self._request("get", url, headers)
+
+    async def _request(
+        self, method: str, url: str, headers: dict[str, str], **kwargs: Any
+    ) -> ResponseProtocol:
+        from aiohttp import ClientError, ClientTimeout
+
+        try:
+            async with getattr(self._session, method)(
+                url,
+                headers=headers,
+                timeout=ClientTimeout(total=30),
+                allow_redirects=False,
+                **kwargs,
+            ) as response:
+                try:
+                    payload = await response.json(content_type=None)
+                except ValueError:
+                    payload = None
+                return AiohttpResponseAdapter(response.status, payload)
+        except ClientError as err:
+            raise YunoConnectionError("Yuno API request failed") from err
 
 
 @dataclass(frozen=True)
@@ -146,19 +133,28 @@ class YunoApiClient:
 
     async def login(self, auth: AuthConfig) -> LoginResult:
         """Log in with encrypted app credentials and return a session token."""
-        response = await self._session.post(
-            f"{self._base_url}/api/login",
-            headers=self._headers(auth, auth.login_signature),
-            json={
-                "email": auth.encrypted_email,
-                "password": auth.encrypted_password,
-                "isPersistent": True,
-            },
-        )
+        url = f"{self._base_url}/api/login"
+        headers = self._headers(auth, auth.login_signature)
+        if auth.login_body is not None:
+            response = await self._session.post(
+                url,
+                headers=headers,
+                data=auth.login_body.encode("utf-8"),
+            )
+        else:
+            response = await self._session.post(
+                url,
+                headers=headers,
+                json={
+                    "email": auth.encrypted_email,
+                    "password": auth.encrypted_password,
+                    "isPersistent": True,
+                },
+            )
         payload = self._checked_payload(response, action="authentication")
         token = payload.get("sessionToken")
         if not isinstance(token, str) or not token:
-            raise YunoApiError("authentication failed: missing session token")
+            raise YunoApiError("authentication failed: response missing session token")
         return LoginResult(session_token=token)
 
     async def get_electricity_usage(self, auth: AuthConfig, *, session_token: str) -> UsageResult:
@@ -174,6 +170,24 @@ class YunoApiClient:
             hourly=_parse_hourly_usage(payload.get("hourlyUsageDetails")),
             daily=_parse_daily_usage(payload.get("dailyUsageDetails")),
         )
+
+    async def get_authenticated_usage(
+        self, auth: AuthConfig, *, session_token: str = "", allow_login: bool = True
+    ) -> tuple[UsageResult, str]:
+        """Reuse a session, logging in at most once when authentication fails."""
+        if session_token:
+            try:
+                return await self.get_electricity_usage(
+                    auth, session_token=session_token
+                ), session_token
+            except YunoAuthenticationError:
+                if not allow_login:
+                    raise
+        elif not allow_login:
+            raise YunoAuthenticationError("authentication failed: no session or login credentials")
+        login = await self.login(auth)
+        usage = await self.get_electricity_usage(auth, session_token=login.session_token)
+        return usage, login.session_token
 
     @staticmethod
     def _headers(auth: AuthConfig, signature: str) -> dict[str, str]:
@@ -191,13 +205,18 @@ class YunoApiClient:
     def _checked_payload(response: ResponseProtocol, *, action: str) -> dict[str, Any]:
         payload = response.json()
         details = _api_error_details(payload)
-        if response.status_code in {401, 403}:
-            raise YunoApiError(
-                f"{action} failed: authentication failed "
-                f"(HTTP {response.status_code}{details})"
+        if response.status_code in {401, 403} or (
+            action == "authentication"
+            and response.status_code == 400
+            and isinstance(payload, dict)
+            and payload.get("errorCode") in (1004, "1004")
+        ):
+            raise YunoAuthenticationError(
+                f"{action} failed: authentication failed (HTTP {response.status_code}{details})"
             )
-        if response.status_code >= 400:
-            raise YunoApiError(f"{action} failed: HTTP {response.status_code}{details}")
+        if not 200 <= response.status_code < 300:
+            label = "login request" if action == "authentication" else action
+            raise YunoApiError(f"{label} failed: HTTP {response.status_code}{details}")
         if not isinstance(payload, dict):
             raise YunoApiError(f"{action} failed: response was not a JSON object")
         return payload

@@ -15,8 +15,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-  "pytest>=8.0,<9",
-  "pytest-asyncio>=0.23,<1",
+  "pytest>=8.0,<10",
+  "pytest-asyncio>=0.24,<2",
   "pytest-homeassistant-custom-component>=0.13.0,<1",
   "ruff>=0.6,<1",
   "mypy>=1.11,<2",
@@ -28,6 +28,8 @@ include = ["custom_components*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+asyncio_default_fixture_loop_scope = "function"
+asyncio_mode = "auto"
 
 [tool.ruff]
 line-length = 100
@@ -37,7 +39,6 @@ target-version = "py312"
 select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
 
 [tool.mypy]
-python_version = "3.12"
 strict = true
 warn_unused_ignores = false
 disable_error_code = ["import-untyped"]

@@ -13,9 +13,15 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .config_data import auth_config_from_data, has_login_credentials, session_token_from_data
-from .const import CONF_SCAN_INTERVAL_MINUTES, DEFAULT_SCAN_INTERVAL, DOMAIN
+from .const import CONF_SCAN_INTERVAL_MINUTES, CONF_SESSION_TOKEN, DEFAULT_SCAN_INTERVAL, DOMAIN
 from .statistics import async_import_hourly_statistics
-from .yuno_api.client import AiohttpSessionAdapter, YunoApiClient, YunoApiError
+from .yuno_api.client import (
+    AiohttpSessionAdapter,
+    YunoApiClient,
+    YunoApiError,
+    YunoAuthenticationError,
+    YunoConnectionError,
+)
 from .yuno_api.models import DailyUsage
 
 
@@ -63,37 +69,21 @@ class YunoEnergyCoordinator(DataUpdateCoordinator[Any]):
                 )
             )
             self.energy_last_sum = float(stored.get("energy_last_sum", stored.get("last_sum", 0.0)))
-            self.imported_cost_starts = set(
-                cast(list[str], stored.get("imported_cost_starts", []))
-            )
+            self.imported_cost_starts = set(cast(list[str], stored.get("imported_cost_starts", [])))
             self.cost_last_sum = float(stored.get("cost_last_sum", 0.0))
             entry_data = dict(self.entry.data)
             auth = auth_config_from_data(entry_data)
-            try:
-                if configured_session_token := session_token_from_data(entry_data):
-                    usage = await self.api.get_electricity_usage(
-                        auth,
-                        session_token=configured_session_token,
-                    )
-                else:
-                    login = await self.api.login(auth)
-                    usage = await self.api.get_electricity_usage(
-                        auth,
-                        session_token=login.session_token,
-                    )
-            except YunoApiError as err:
-                if (
-                    configured_session_token
-                    and "authentication failed" in str(err)
-                    and has_login_credentials(entry_data)
-                ):
-                    login = await self.api.login(auth)
-                    usage = await self.api.get_electricity_usage(
-                        auth,
-                        session_token=login.session_token,
-                    )
-                else:
-                    raise
+            configured_session_token = session_token_from_data(entry_data)
+            usage, session_token = await self.api.get_authenticated_usage(
+                auth,
+                session_token=configured_session_token,
+                allow_login=has_login_credentials(entry_data),
+            )
+            if session_token != configured_session_token:
+                self.hass.config_entries.async_update_entry(
+                    self.entry,
+                    data={**entry_data, CONF_SESSION_TOKEN: session_token},
+                )
             (
                 self.imported_energy_starts,
                 self.energy_last_sum,
@@ -116,9 +106,11 @@ class YunoEnergyCoordinator(DataUpdateCoordinator[Any]):
                     "cost_last_sum": self.cost_last_sum,
                 }
             )
+        except YunoAuthenticationError as err:
+            raise ConfigEntryAuthFailed from err
+        except YunoConnectionError as err:
+            raise UpdateFailed("Yuno API request failed") from err
         except YunoApiError as err:
-            if "authentication failed" in str(err):
-                raise ConfigEntryAuthFailed from err
             raise UpdateFailed(str(err)) from err
         except (TimeoutError, OSError) as err:
             raise UpdateFailed("Yuno API request failed") from err

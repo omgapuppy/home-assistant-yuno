@@ -33,9 +33,16 @@ class FakeSession:
         url: str,
         *,
         headers: dict[str, str],
-        json: dict[str, object],
+        json: dict[str, object] | None = None,
+        data: bytes | None = None,
     ) -> FakeResponse:
-        self.requests.append(("POST", url, {"headers": headers, "json": json}))
+        self.requests.append(
+            (
+                "POST",
+                url,
+                {"headers": headers, **({"data": data} if data is not None else {"json": json})},
+            )
+        )
         payload = json_fixture("login_response.json")
         return FakeResponse(200, payload)
 
@@ -166,7 +173,8 @@ async def test_raises_auth_error_for_unauthorized_response() -> None:
             url: str,
             *,
             headers: dict[str, str],
-            json: dict[str, object],
+            json: dict[str, object] | None = None,
+            data: bytes | None = None,
         ) -> FakeResponse:
             return FakeResponse(401, {"message": "unauthorized"})
 

@@ -7,6 +7,7 @@ __pycache__/
 .coverage
 htmlcov/
 .venv/
+.venv-*/
 venv/
 
 # Home Assistant/local runtime
@@ -43,3 +44,9 @@ appbillpay.yunoenergy.ie_*.yaml
 .DS_Store
 .idea/
 .vscode/
+
+# Generated packages and private setup values
+dist/
+*.egg-info/
+yuno-setup*.json
+account-data*.json

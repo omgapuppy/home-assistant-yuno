@@ -8,21 +8,27 @@ from typing import Any
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
 
 from .config_data import (
+    account_data_from_input,
     auth_config_from_data,
     has_basic_auth,
     has_login_credentials,
     session_token_from_data,
 )
 from .const import (
+    AUTH_MODE_ACCOUNT,
+    CONF_AUTH_MODE,
     CONF_BASIC_AUTHORIZATION,
     CONF_BASIC_PASSWORD,
     CONF_BASIC_USERNAME,
+    CONF_EMAIL,
     CONF_ENCRYPTED_EMAIL,
     CONF_ENCRYPTED_PASSWORD,
     CONF_LOGIN_SIGNATURE,
     CONF_ORIGIN_ID,
+    CONF_PASSWORD,
     CONF_SCAN_INTERVAL_MINUTES,
     CONF_SESSION_TOKEN,
     CONF_USAGE_SIGNATURE,
@@ -36,7 +42,7 @@ from .yuno_api.client import AiohttpSessionAdapter, YunoApiClient, YunoApiError
 _LOGGER = logging.getLogger(__name__)
 
 
-def _user_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
+def _manual_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     defaults = defaults or {}
     return vol.Schema(
         {
@@ -84,11 +90,27 @@ def _user_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     )
 
 
+def _account_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
+    defaults = defaults or {}
+    return vol.Schema(
+        {
+            vol.Required(CONF_EMAIL, default=defaults.get(CONF_EMAIL, "")): TextSelector(
+                TextSelectorConfig(type=TextSelectorType.EMAIL)
+            ),
+            vol.Required(CONF_PASSWORD): TextSelector(
+                TextSelectorConfig(type=TextSelectorType.PASSWORD)
+            ),
+            vol.Required(
+                CONF_SCAN_INTERVAL_MINUTES, default=defaults.get(CONF_SCAN_INTERVAL_MINUTES, 360)
+            ): vol.All(vol.Coerce(int), vol.Range(min=MIN_SCAN_INTERVAL_MINUTES)),
+        }
+    )
+
+
 class YunoEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
-    """Handle a config flow for Yuno Energy."""
+    """Set up account login or keep using existing manually supplied values."""
 
     VERSION = 1
-    __yuno_reauth_entry_id: str | None = None
 
     @staticmethod
     def async_get_options_flow(
@@ -101,101 +123,124 @@ class YunoEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: i
         self,
         user_input: dict[str, Any] | None = None,
     ) -> config_entries.ConfigFlowResult:
-        """Create a Yuno Energy config entry."""
-        errors: dict[str, str] = {}
-        description_placeholders: dict[str, str] = {}
-        if user_input is not None:
-            errors, description_placeholders = await self._validate_input(user_input)
-            if not errors:
-                await self.async_set_unique_id(DOMAIN)
-                self._abort_if_unique_id_configured(updates=user_input)
-                return self.async_create_entry(title="Yuno Energy", data=user_input)
+        """Choose how to sign in."""
+        return self.async_show_menu(step_id="user", menu_options=["account", "manual"])
 
-        return self.async_show_form(
-            step_id="user",
-            data_schema=_user_schema(user_input),
-            errors=errors,
-            description_placeholders=description_placeholders,
-        )
+    async def async_step_account(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ) -> config_entries.ConfigFlowResult:
+        """Sign in with the owner's email and password."""
+        return await self._async_credentials_form("account", True, user_input)
+
+    async def async_step_manual(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ) -> config_entries.ConfigFlowResult:
+        """Use existing session tokens or generated/captured login fields."""
+        return await self._async_credentials_form("manual", False, user_input)
 
     async def async_step_reauth(
         self,
         entry_data: dict[str, Any],
     ) -> config_entries.ConfigFlowResult:
-        """Start reauthentication."""
-        entry_id = self.context.get("entry_id")
-        self.__yuno_reauth_entry_id = entry_id if isinstance(entry_id, str) else None
-        return await self.async_step_reauth_confirm(entry_data)
+        """Show a form; do not immediately retry the rejected saved credentials."""
+        return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
         self,
         user_input: dict[str, Any] | None = None,
     ) -> config_entries.ConfigFlowResult:
-        """Update credentials during reauth."""
-        if self.__yuno_reauth_entry_id is None:
+        """Replace credentials while preserving the config entry and statistics."""
+        entry = self._existing_entry()
+        if entry is None:
             return self.async_abort(reason="unknown")
-        entry = self.hass.config_entries.async_get_entry(self.__yuno_reauth_entry_id)
-        defaults = dict(entry.data) if entry else {}
-        errors: dict[str, str] = {}
-        description_placeholders: dict[str, str] = {}
-        if user_input is not None:
-            errors, description_placeholders = await self._validate_input(user_input)
-            if not errors and entry is not None:
-                self.hass.config_entries.async_update_entry(entry, data=user_input)
-                await self.hass.config_entries.async_reload(entry.entry_id)
-                return self.async_abort(reason="reauth_successful")
-        return self.async_show_form(
-            step_id="reauth_confirm",
-            data_schema=_user_schema(user_input or defaults),
-            errors=errors,
-            description_placeholders=description_placeholders,
-        )
+        account_mode = entry.data.get(CONF_AUTH_MODE) == AUTH_MODE_ACCOUNT
+        step_id = "reauth_confirm" if account_mode else "reauth_manual"
+        return await self._async_credentials_form(step_id, account_mode, user_input)
+
+    async def async_step_reauth_manual(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ) -> config_entries.ConfigFlowResult:
+        """Replace manually supplied credentials."""
+        return await self.async_step_reauth_confirm(user_input)
 
     async def async_step_reconfigure(
         self,
         user_input: dict[str, Any] | None = None,
     ) -> config_entries.ConfigFlowResult:
-        """Allow reconfiguration of static headers and polling."""
-        entry_id = self.context.get("entry_id")
-        if not isinstance(entry_id, str):
+        """Allow an existing entry to switch to account login."""
+        if self._existing_entry() is None:
             return self.async_abort(reason="unknown")
-        entry = self.hass.config_entries.async_get_entry(entry_id)
+        return self.async_show_menu(step_id="reconfigure", menu_options=["account", "manual"])
+
+    def _existing_entry(self) -> config_entries.ConfigEntry | None:
+        entry_id = self.context.get("entry_id")
+        return (
+            self.hass.config_entries.async_get_entry(entry_id)
+            if isinstance(entry_id, str)
+            else None
+        )
+
+    async def _async_credentials_form(
+        self,
+        step_id: str,
+        account_mode: bool,
+        user_input: dict[str, Any] | None,
+    ) -> config_entries.ConfigFlowResult:
+        entry = self._existing_entry()
         defaults = dict(entry.data) if entry else {}
         errors: dict[str, str] = {}
-        description_placeholders: dict[str, str] = {}
+        placeholders: dict[str, str] = {}
         if user_input is not None:
-            errors, description_placeholders = await self._validate_input(user_input)
-            if not errors and entry is not None:
-                return self.async_update_reload_and_abort(entry, data=user_input)
+            try:
+                data = account_data_from_input(user_input) if account_mode else dict(user_input)
+            except ValueError:
+                errors = {"base": "invalid_credentials"}
+            else:
+                errors, placeholders = await self._validate_input(data)
+                if not errors:
+                    if self.context.get("source") in {"reauth", "reconfigure"}:
+                        if entry is None:
+                            return self.async_abort(reason="unknown")
+                        reason = (
+                            "reauth_successful"
+                            if self.context.get("source") == "reauth"
+                            else "reconfigure_successful"
+                        )
+                        return self.async_update_reload_and_abort(entry, data=data, reason=reason)
+                    await self.async_set_unique_id(DOMAIN)
+                    self._abort_if_unique_id_configured()
+                    return self.async_create_entry(title="Yuno Energy", data=data)
+        schema = _account_schema if account_mode else _manual_schema
         return self.async_show_form(
-            step_id="reconfigure",
-            data_schema=_user_schema(user_input or defaults),
+            step_id=step_id,
+            data_schema=schema(user_input or defaults),
             errors=errors,
-            description_placeholders=description_placeholders,
+            description_placeholders=placeholders,
         )
 
     async def _validate_input(
         self,
-        user_input: dict[str, Any],
+        data: dict[str, Any],
     ) -> tuple[dict[str, str], dict[str, str]]:
-        if not has_basic_auth(user_input):
+        if not has_basic_auth(data):
             return {"base": "missing_basic_auth"}, {}
-        if not session_token_from_data(user_input) and not has_login_credentials(user_input):
+        if not session_token_from_data(data) and not has_login_credentials(data):
             return {"base": "missing_login_or_session"}, {}
-        client = YunoApiClient(
-            session=AiohttpSessionAdapter(async_get_clientsession(self.hass)),
-        )
+        client = YunoApiClient(session=AiohttpSessionAdapter(async_get_clientsession(self.hass)))
         try:
-            auth = auth_config_from_data(user_input)
-            if session_token := session_token_from_data(user_input):
-                await client.get_electricity_usage(auth, session_token=session_token)
-            else:
-                await client.login(auth)
+            _, token = await client.get_authenticated_usage(
+                auth_config_from_data(data),
+                session_token=session_token_from_data(data),
+                allow_login=has_login_credentials(data),
+            )
         except (YunoApiError, TimeoutError, OSError) as err:
             detail = diagnostic_message_from_exception(err)
             _LOGGER.warning("Yuno validation failed: %s", detail)
-            _LOGGER.debug("Yuno login validation failed", exc_info=True)
             return {"base": error_key_from_exception(err)}, {"detail": detail}
+        data[CONF_SESSION_TOKEN] = token
         return {}, {}
 
 
