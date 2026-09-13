@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.7
 
 - Add email/password setup using the verified Android login format, with no proxy capture.
 - Save encrypted app credentials and session tokens without retaining the plain password.
