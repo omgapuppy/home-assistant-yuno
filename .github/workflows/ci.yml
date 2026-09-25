@@ -13,7 +13,8 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  checks:
+    name: test (${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -31,3 +32,14 @@ jobs:
         run: mypy custom_components tests scripts
       - name: Test
         run: pytest
+
+  test:
+    name: test
+    if: always()
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify test matrix
+        env:
+          MATRIX_RESULT: ${{ needs.checks.result }}
+        run: test "${MATRIX_RESULT}" = "success"
