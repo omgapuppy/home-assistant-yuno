@@ -154,13 +154,12 @@ async def async_import_hourly_statistics(
 
     recorder_stats = cast(Any, recorder_statistics)
     if energy_rows:
-        metadata = recorder_stats.StatisticMetaData(
-            has_mean=False,
-            has_sum=True,
+        metadata = _sum_metadata(
+            recorder_stats,
             name="Yuno Energy electricity import",
-            source=STATISTICS_SOURCE,
             statistic_id=statistic_id_for_entry(entry_id),
             unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+            unit_class="energy",
         )
         statistic_rows = [
             recorder_stats.StatisticData(start=row.start, state=row.state, sum=row.sum)
@@ -173,13 +172,12 @@ async def async_import_hourly_statistics(
         energy_last_sum = energy_rows[-1].sum
 
     if cost_rows:
-        metadata = recorder_stats.StatisticMetaData(
-            has_mean=False,
-            has_sum=True,
+        metadata = _sum_metadata(
+            recorder_stats,
             name="Yuno Energy electricity import cost",
-            source=STATISTICS_SOURCE,
             statistic_id=cost_statistic_id_for_entry(entry_id),
             unit_of_measurement="EUR",
+            unit_class=None,
         )
         statistic_rows = [
             recorder_stats.StatisticData(start=row.start, state=row.state, sum=row.sum)
@@ -190,3 +188,31 @@ async def async_import_hourly_statistics(
         cost_last_sum = cost_rows[-1].sum
 
     return imported_energy_starts, energy_last_sum, imported_cost_starts, cost_last_sum
+
+
+def _sum_metadata(
+    recorder_stats: Any,
+    *,
+    name: str,
+    statistic_id: str,
+    unit_of_measurement: str,
+    unit_class: str | None,
+) -> dict[str, Any]:
+    """Describe a sum-only series using the installed recorder's metadata schema."""
+    metadata: dict[str, Any] = {
+        "has_sum": True,
+        "name": name,
+        "source": STATISTICS_SOURCE,
+        "statistic_id": statistic_id,
+        "unit_of_measurement": unit_of_measurement,
+    }
+    fields = recorder_stats.StatisticMetaData.__annotations__
+    # These fields were introduced separately; preserve support for older cores
+    # without relying on the compatibility backfill removed in HA 2026.11.
+    if "mean_type" in fields:
+        metadata["mean_type"] = recorder_stats.StatisticMeanType.NONE
+    else:
+        metadata["has_mean"] = False
+    if "unit_class" in fields:
+        metadata["unit_class"] = unit_class
+    return metadata
