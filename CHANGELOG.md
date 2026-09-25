@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.8
+
+- Update recorder statistic metadata for current Home Assistant releases while preserving compatibility with older versions.
+- Add recorder validation coverage for both metadata schemas.
+- Make the required `test` check report reliably after the Python-version test matrix completes.
+
 ## 0.1.7
 
 - Add email/password setup using the verified Android login format, with no proxy capture.
