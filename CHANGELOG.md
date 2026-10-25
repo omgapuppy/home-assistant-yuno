@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.9
+
+- Support config and options forms on both Voluptuous-based and Probatio-based Home Assistant releases.
+- Keep all Python-version CI jobs running after one matrix job fails, so failures remain diagnosable.
+- Prevent local duplicate, editor, or setup-data files from leaking into integration ZIPs.
+- Synchronize the Python package version with the integration manifest.
+
 ## 0.1.8
 
 - Update recorder statistic metadata for current Home Assistant releases while preserving compatibility with older versions.

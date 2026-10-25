@@ -88,3 +88,15 @@ def test_packaged_helper_runs_on_its_own(tmp_path: Path) -> None:
             "synthetic",
         ).setup_values()
     )
+
+
+def test_package_source_filter_rejects_local_and_editor_files() -> None:
+    from scripts.build_artifacts import COMPONENT, ROOT, _is_component_source
+
+    component = ROOT / COMPONENT
+    assert _is_component_source(component / "sensor.py")
+    assert _is_component_source(component / "yuno_api" / "auth.py")
+    assert _is_component_source(component / "translations" / "en.json")
+    assert not _is_component_source(component / "sensor 2.py")
+    assert not _is_component_source(component / "account-data.json")
+    assert not _is_component_source(component / "translations" / "notes.txt")

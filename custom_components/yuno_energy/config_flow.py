@@ -5,7 +5,13 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import voluptuous as vol
+try:
+    # Home Assistant 2026.10 and newer validate config flows with Probatio.
+    import probatio as vol
+except ImportError:  # pragma: no cover - exercised by the older-HA CI job
+    # Home Assistant versions before the Probatio migration expect Voluptuous
+    # schemas and, importantly, catch Voluptuous validation errors.
+    import voluptuous as vol  # type: ignore[no-redef]
 from homeassistant import config_entries
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
