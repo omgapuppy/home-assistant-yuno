@@ -14,6 +14,20 @@ ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = Path("custom_components/yuno_energy")
 
 
+def _is_component_source(source: Path) -> bool:
+    """Return whether a file belongs in the integration archive."""
+    relative = source.relative_to(ROOT / COMPONENT)
+    if source.suffix == ".py":
+        return all(part.isidentifier() for part in relative.with_suffix("").parts)
+    if relative in {Path("manifest.json"), Path("strings.json")}:
+        return True
+    return (
+        relative.parent == Path("translations")
+        and source.suffix == ".json"
+        and all(character.isalnum() or character in "-_" for character in source.stem)
+    )
+
+
 def build(output_dir: Path) -> tuple[Path, Path]:
     """Package only integration source files; never include local setup outputs."""
     version = json.loads((ROOT / COMPONENT / "manifest.json").read_text())["version"]
@@ -22,7 +36,7 @@ def build(output_dir: Path) -> tuple[Path, Path]:
     with ZipFile(archive, "w", ZIP_DEFLATED) as handle:
         handle.write(ROOT / "LICENSE", COMPONENT / "LICENSE")
         for source in sorted((ROOT / COMPONENT).rglob("*")):
-            if source.is_file() and source.suffix in {".py", ".json"}:
+            if source.is_file() and _is_component_source(source):
                 handle.write(source, source.relative_to(ROOT))
     helper = output_dir / "yuno-setup.pyz"
     with tempfile.TemporaryDirectory() as directory:

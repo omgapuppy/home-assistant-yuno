@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.yuno_energy.config_data import account_data_from_input
@@ -47,6 +47,17 @@ async def test_account_flow_stores_token_but_no_plaintext_password(hass: HomeAss
     assert "synthetic" not in repr(result["data"])
     api.assert_awaited_once()
     assert api.call_args.kwargs == {"session_token": "", "allow_login": True}
+
+
+async def test_account_flow_rejects_too_short_scan_interval(hass: HomeAssistant) -> None:
+    result = await start_account_flow(hass)
+    with patch(API) as api, pytest.raises(InvalidData) as exc_info:
+        await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {**INPUT, "scan_interval_minutes": 1},
+        )
+    assert "scan_interval_minutes" in exc_info.value.schema_errors
+    api.assert_not_awaited()
 
 
 async def test_rejected_credentials_redisplay_form_without_password_default(
