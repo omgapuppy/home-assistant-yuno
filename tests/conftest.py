@@ -12,3 +12,10 @@ def mock_yuno_http_session() -> Iterator[None]:
         patch("custom_components.yuno_energy.coordinator.async_get_clientsession"),
     ):
         yield
+
+
+@pytest.fixture
+def mock_recorder_setup() -> Iterator[None]:
+    """Config-flow tests do not need a Recorder database or its worker thread."""
+    with patch("homeassistant.components.recorder.async_setup", return_value=True):
+        yield
