@@ -5,6 +5,9 @@
     "@omgapuppy"
   ],
   "config_flow": true,
+  "dependencies": [
+    "recorder"
+  ],
   "documentation": "https://github.com/omgapuppy/home-assistant-yuno",
   "integration_type": "service",
   "iot_class": "cloud_polling",
