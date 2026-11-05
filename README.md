@@ -10,6 +10,26 @@ with Yuno Energy.
 
 ## Install and sign in
 
+### Marketplace or HACS
+
+[![Open Yuno Energy in Home Assistant](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=omgapuppy&repository=home-assistant-yuno&category=integration)
+
+Home Assistant 2026.11 and newer include **Settings → Marketplace**. Earlier
+versions can use HACS. Until Yuno Energy is included in the default catalog,
+the button above offers to add this repository as a custom repository with type
+**Integration**. Adding a custom repository in Marketplace requires connecting
+GitHub.
+
+1. Add the repository, then download **Yuno Energy**.
+2. Follow any restart prompt, then open **Settings → Devices & services → Add
+   integration → Yuno Energy** (or use the setup button offered by Marketplace).
+3. Choose **Sign in with email and password** and enter your Yuno credentials.
+4. Add the imported statistics to the Energy Dashboard as described below.
+
+Updates appear in Marketplace or HACS. Restart Home Assistant when prompted.
+
+### Manual installation
+
 1. Download this repository using **Code → Download ZIP**.
 2. Copy `custom_components/yuno_energy` into Home Assistant's
    `/config/custom_components/` directory, replacing that directory if upgrading.
