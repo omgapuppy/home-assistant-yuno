@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.10
+
+- Add Marketplace/HACS metadata and installation links for Ireland.
+- Validate the integration with HACS and hassfest on changes and daily.
+- Declare the integration maintainer and service type.
+- Include Yuno brand icons in the integration and downloadable archives.
+
 ## 0.1.9
 
 - Support config and options forms on both Voluptuous-based and Probatio-based Home Assistant releases.

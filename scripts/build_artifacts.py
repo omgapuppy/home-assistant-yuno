@@ -21,6 +21,8 @@ def _is_component_source(source: Path) -> bool:
         return all(part.isidentifier() for part in relative.with_suffix("").parts)
     if relative in {Path("manifest.json"), Path("strings.json")}:
         return True
+    if relative.parent == Path("brand"):
+        return relative.name in {"icon.png", "icon@2x.png"}
     return (
         relative.parent == Path("translations")
         and source.suffix == ".json"

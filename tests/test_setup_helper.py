@@ -72,6 +72,8 @@ def test_packaged_helper_runs_on_its_own(tmp_path: Path) -> None:
         names = package.namelist()
     assert "custom_components/yuno_energy/yuno_api/auth.py" in names
     assert "custom_components/yuno_energy/translations/en.json" in names
+    assert "custom_components/yuno_energy/brand/icon.png" in names
+    assert "custom_components/yuno_energy/brand/icon@2x.png" in names
     assert all(name.startswith("custom_components/yuno_energy/") for name in names)
     result = subprocess.run(
         [sys.executable, "-S", str(helper)],
@@ -97,6 +99,9 @@ def test_package_source_filter_rejects_local_and_editor_files() -> None:
     assert _is_component_source(component / "sensor.py")
     assert _is_component_source(component / "yuno_api" / "auth.py")
     assert _is_component_source(component / "translations" / "en.json")
+    assert _is_component_source(component / "brand" / "icon.png")
+    assert _is_component_source(component / "brand" / "icon@2x.png")
+    assert not _is_component_source(component / "brand" / "account-data.png")
     assert not _is_component_source(component / "sensor 2.py")
     assert not _is_component_source(component / "account-data.json")
     assert not _is_component_source(component / "translations" / "notes.txt")

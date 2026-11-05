@@ -14,7 +14,9 @@ from custom_components.yuno_energy.yuno_api.client import UsageResult, YunoAuthe
 
 pytestmark = [
     pytest.mark.asyncio,
-    pytest.mark.usefixtures("enable_custom_integrations", "mock_yuno_http_session"),
+    pytest.mark.usefixtures(
+        "enable_custom_integrations", "mock_yuno_http_session", "mock_recorder_setup"
+    ),
 ]
 API = "custom_components.yuno_energy.config_flow.YunoApiClient.get_authenticated_usage"
 SETUP = "custom_components.yuno_energy.async_setup_entry"
